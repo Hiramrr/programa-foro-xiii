@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Pruebas · XIII Foro</title>
+  <link rel="stylesheet" href="styles.css?v=13">
+  <style>
+    body { padding: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr); height: 100vh; }
+    .pruebas { overflow-y: auto; padding: 20px 16px 32px; border-right: 1px solid var(--borde); }
+    .pruebas h1 { font-size: 20px; }
+    .pruebas .panel { margin-top: 26px; padding: 20px 12px 12px; }
+    .pruebas .botones { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pruebas button { min-height: 34px; padding: 4px 9px; font-size: 14px; }
+    .pruebas input, .pruebas select { width: 100%; margin-bottom: 6px; padding: 6px; border: 1px solid var(--borde); border-radius: 0; background: #fff; color: var(--texto); font-size: 14px; }
+    .pruebas p { color: var(--tenue); font-size: 13px; margin-top: 6px; }
+    #reloj { color: var(--verde); font-size: 18px; margin: 8px 0 0; }
+    iframe { width: 100%; height: 100%; border: 0; }
+    @media (max-width: 760px) {
+      body { grid-template-columns: 1fr; grid-template-rows: 45vh 55vh; }
+      .pruebas { border-right: 0; border-bottom: 1px solid var(--borde); }
+    }
+  </style>
+  <script type="module" src="pruebas.js?v=11"></script>
+</head>
+<body>
+  <aside class="pruebas" aria-label="Pruebas rápidas">
+    <h1>Pruebas rápidas</h1>
+    <p>La app real corre a la derecha con un reloj simulado. Cada botón salta a unos segundos antes del momento indicado. Los diplomas de prueba se guardan aparte de los reales.</p>
+    <p id="reloj" role="status">—</p>
+    <p><a id="abrir-pestana" href="index.html" target="_blank" rel="noopener">Abrir esta vista en otra pestaña ↗</a></p>
+
+    <section class="panel">
+      <h2 class="rotulo">[ ir a una hora ]</h2>
+      <input id="hora" type="datetime-local" step="1" value="2026-11-12T09:09:50" min="2026-11-12T00:00" max="2026-11-14T00:00" aria-label="Hora simulada">
+      <div class="botones">
+        <button type="button" id="ir-hora" class="principal">Ir</button>
+        <button type="button" id="hora-real">Hora real</button>
+        <button type="button" id="recargar">Recargar</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="rotulo">[ festejos ]</h2>
+      <div class="botones" id="hitos-tipo"></div>
+      <select id="hitos-todos" aria-label="Todos los hitos del foro"></select>
+      <button type="button" id="ir-hito">Ir al hito elegido</button>
+    </section>
+
+    <section class="panel">
+      <h2 class="rotulo">[ contador ]</h2>
+      <div class="botones">
+        <button type="button" data-contador="final">Cuenta final</button>
+        <button type="button" data-contador="durante">En curso</button>
+        <button type="button" data-contador="finalizada">Finalizada</button>
+        <button type="button" data-contador="pantalla">Contador en pantalla</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="rotulo">[ receso ]</h2>
+      <div class="botones">
+        <button type="button" data-receso="inicio">Inicio del receso</button>
+        <button type="button" data-receso="final">Últimos segundos</button>
+        <button type="button" data-receso="automatico">Automático: diploma y receso</button>
+      </div>
+      <p>Al terminar, la pantalla de receso pasa sola al contador de la siguiente actividad.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="rotulo">[ modos ]</h2>
+      <div class="botones">
+        <button type="button" id="prueba-rapida">Prueba rápida</button>
+        <button type="button" data-auto="arranque">Automático: inicio del foro</button>
+        <button type="button" data-auto="diploma">Automático: diploma al terminar</button>
+        <button type="button" data-auto="cierre">Automático: clausura</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="rotulo">[ diplomas ]</h2>
+      <div class="botones">
+        <button type="button" id="diploma-preparar">Preparar uno</button>
+        <button type="button" id="diploma-mostrar">Mostrar uno</button>
+        <button type="button" id="diploma-ultimo">Todos listos</button>
+        <button type="button" id="diploma-borrar">Borrar de prueba</button>
+      </div>
+      <p>«Todos listos» prepara todos menos uno y abre el que falta: al guardarlo sale el festejo final.</p>
+    </section>
+  </aside>
+  <iframe id="marco" title="Programa con reloj simulado" allow="fullscreen" src="index.html?t=2026-11-12T09:09:50"></iframe>
+</body>
+</html>
