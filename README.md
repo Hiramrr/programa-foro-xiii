@@ -41,7 +41,15 @@ Cada cambio de pantalla de la proyección, el inicio y el fin del foro y de cada
 
 ## Desarrollo
 
-GitHub Actions ejecuta las pruebas y publica `dist/` en GitHub Pages con cada cambio en `main`. También se puede ejecutar manualmente desde la pestaña Actions del repositorio.
+GitHub Pages publica la raíz de la rama `gh-pages`. Para actualizar la página después de guardar los cambios en `main`, ejecuta:
+
+```sh
+node --test tests/*.test.mjs
+git push origin main
+git subtree push --prefix dist origin gh-pages
+```
+
+La rama `gh-pages` contiene solo los archivos de `dist/`. El archivo `.nojekyll` permite que Pages los publique como archivos estáticos.
 
 Ejecuta `python3 -m http.server 4173 --directory dist` para abrir la página localmente. Ejecuta `node --test tests/*.test.mjs` para comprobar los límites horarios del contador, el horario ajustado y los hitos que se festejan. El horario ajustado se calcula en `dist/contador.mjs` (`calcularHorario`). Los hitos se calculan en `dist/hitos.mjs` y los festejos se dibujan en `dist/festejos.js`.
 
