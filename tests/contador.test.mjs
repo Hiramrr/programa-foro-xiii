@@ -23,22 +23,20 @@ test('rechaza horarios inválidos', () => {
 });
 
 const events = [
-  { key: 'uno', startMs: inicio, endMs: fin, recognition: true },
-  { key: 'dos', startMs: fin, endMs: fin + 1200000, recognition: false }
+  { key: 'uno', startMs: inicio, endMs: fin },
+  { key: 'dos', startMs: fin, endMs: fin + 1200000 }
 ];
 test('el modo automático elige la próxima conferencia y luego la actual', () => {
   assert.equal(estadoAutomatico(events, inicio - 1000).record.key, 'uno');
   assert.equal(estadoAutomatico(events, inicio).mode, 'contador');
   assert.equal(estadoAutomatico(events, inicio).record.key, 'uno');
 });
-test('muestra el diploma quince segundos y continúa con la siguiente', () => {
-  assert.equal(estadoAutomatico(events, fin).mode, 'diploma');
-  assert.equal(estadoAutomatico(events, fin + 14999).record.key, 'uno');
-  assert.equal(estadoAutomatico(events, fin + 15000).mode, 'contador');
-  assert.equal(estadoAutomatico(events, fin + 15000).record.key, 'dos');
+test('al terminar una conferencia pasa directo a la siguiente', () => {
+  assert.equal(estadoAutomatico(events, fin - 1).record.key, 'uno');
+  assert.equal(estadoAutomatico(events, fin).mode, 'contador');
+  assert.equal(estadoAutomatico(events, fin).record.key, 'dos');
 });
-test('termina el programa y permite acelerar la duración de la prueba', () => {
-  assert.equal(estadoAutomatico(events, fin + 4000, 4000).record.key, 'dos');
+test('termina el programa', () => {
   assert.equal(estadoAutomatico(events, fin + 1200000).mode, 'fin');
   assert.equal(estadoAutomatico([], inicio).mode, 'fin');
 });
@@ -48,8 +46,7 @@ test('durante un receso muestra su pantalla con la actividad que sigue', () => {
     { key: 'receso', startMs: fin, endMs: fin + 600000, kind: 'break' },
     { key: 'tres', startMs: fin + 600000, endMs: fin + 1800000 }
   ];
-  assert.equal(estadoAutomatico(conReceso, fin + 1000).mode, 'diploma');
-  const estado = estadoAutomatico(conReceso, fin + 15000);
+  const estado = estadoAutomatico(conReceso, fin + 1000);
   assert.equal(estado.mode, 'receso');
   assert.equal(estado.record.key, 'receso');
   assert.equal(estado.siguiente.key, 'tres');

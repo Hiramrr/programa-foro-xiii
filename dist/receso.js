@@ -1,27 +1,106 @@
+// Taza de café en arte ASCII para los recesos: el vapor sube animado y cada bloque lleva su color.
+const vapor = String.raw`
+                              ░░              ░░              ░░
+                              ░░              ░░              ░░
+                                ░░              ░░              ░░
+                                ░░              ░░              ░░
+                              ░░              ░░              ░░
+                              ░░              ░░              ░░
+                            ░░              ░░              ░░
+                            ░░              ░░              ░░
+                              ░░              ░░              ░░
+                              ░░              ░░              ░░
+                                ░░              ░░              ░░
+                                ░░              ░░              ░░
+                              ░░              ░░              ░░
+                              ░░              ░░              ░░
+`.split('\n').slice(1, -1);
+
+const taza = String.raw`
+
+                                    ▓▓██████████████████████
+                            ████████                        ████████
+                        ████        ████████████████████████        ████
+                      ██░░    ██████▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▒██▓▓██  ░░░░██
+                    ██    ████▒▒▓▓▓▓▓▓▓▓░░░░░░▓▓▓▓░░░░░░▓▓▓▓▒▒▓▓▓▓████    ██
+                  ██    ██▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓░░░░▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▒▒▓▓██    ██
+                  ██  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▓▓▒▒▓▓▓▓  ██  ██▓▓▓▓▓▓██
+                  ██  ██▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▒██  ████          ██
+                  ██    ██▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██    ██              ██
+                    ██  ░░████▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓████░░  ██░░    ████      ██
+                    ██        ██████▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓██████        ██  ████    ██    ██
+                    ██              ████████████████████████              ████        ██    ██
+                    ██                ░░  ░░░░░░░░░░░░░░░░░░              ██          ██    ██
+                ██████                                                    ██████    ██      ██
+            ████    ██                                                    ██    ██  ██    ██
+        ░░██▒▒░░    ▒▒▓▓                                                ▓▓▒▒    ░░██▒▒    ██
+      ▓▓  ░░          ██                                                ██  ██████      ▓▓
+    ██                ██                                                ████        ████  ██
+  ██                  ░░██                                            ██░░░░    ████░░░░  ░░██
+  ██                ██████                                            ██████████░░░░        ██
+██                ██▒▒░░▒▒██                                        ██▒▒▒▒██                  ██
+██              ██▒▒██▒▒▒▒██                                        ██▒▒▒▒▒▒██                ██
+██              ██░░▓▓████▒▒▓▓                                    ▓▓▒▒██░░▒▒██                ██
+  ██            ██▒▒██▓▓░░▒▒▒▒██                                ██▒▒░░▒▒████                ██
+  ██              ██░░██▒▒████▒▒████                        ████▒▒██▒▒██▒▒██                ██
+    ██            ██▒▒▒▒██▓▓░░▒▒░░▒▒██▓▓▓▓            ▓▓▓▓██▒▒██▒▒░░██▒▒░░██              ██
+      ██            ██████▒▒▒▒▒▒██████▒▒▒▒████████████▒▒██▒▒▒▒▓▓██▒▒▒▒████░░            ██
+        ██                ██████░░▒▒██░░▒▒██▒▒▒▒░░▒▒██▒▒▒▒██░░▒▒▒▒████                ██
+          ████                ██▒▒▒▒▓▓▒▒▒▒██░░▒▒████▒▒░░▒▒▒▒██████                ████
+          ░░  ████              ████  ████░░████░░░░████████    ░░            ████
+                  ████                                                    ████
+                      ██▓▓▓▓██                                    ▓▓▓▓▓▓██
+                              ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+`.split('\n').slice(1, -1);
+
+const ancho = 96;
+// Filas de la superficie del café (dentro del borde de la taza): ahí ▓ es café y ░ es la crema.
+// El asa de la derecha (desde la columna 76) no lleva café.
+const cafe = (fila, columna) => fila >= 4 && fila <= 11 && columna < 76;
+const tono = (caracter, fila, columna) => caracter === '█' ? 'tz-borde'
+  : caracter === '▓' ? (cafe(fila, columna) ? 'tz-cafe' : 'tz-sombra')
+  : caracter === '▒' ? (cafe(fila, columna) ? 'tz-reflejo' : 'tz-plato')
+  : caracter === '░' ? (cafe(fila, columna) ? 'tz-crema' : 'tz-brillo') : '';
+
+function pintar(lineas) {
+  const pre = document.createElement('pre');
+  pre.className = 'tz-cuerpo';
+  lineas.forEach((linea, fila) => {
+    // Agrupa los caracteres iguales seguidos en un solo span del mismo color.
+    for (const { 0: tramo, index: columna } of linea.padEnd(ancho).matchAll(/(.)\1*/gu)) {
+      const clase = tono(tramo[0], fila, columna);
+      if (!clase) { pre.append(tramo); continue; }
+      const span = document.createElement('span');
+      span.className = clase;
+      span.textContent = tramo;
+      pre.append(span);
+    }
+    pre.append('\n');
+  });
+  return pre;
+}
+
 export function tazaAnimada() {
   const nodo = document.createElement('div');
   nodo.className = 'taza';
   nodo.setAttribute('aria-hidden', 'true');
-  nodo.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 40" width="288" height="240" shape-rendering="crispEdges" focusable="false">
-      <g class="vapor" fill="var(--tenue)">
-        <path d="M16 4h2v3h-2v2h-2V7h2z M14 11h2v2h-2z"/>
-        <path d="M23 2h2v3h-2v2h-2V5h2z M21 9h2v3h-2z"/>
-        <path d="M30 4h2v3h-2v2h-2V7h2z M28 11h2v2h-2z"/>
-      </g>
-      <g fill="var(--azul)">
-        <path d="M6 34h36v2h-2v2H8v-2H6z"/>
-        <path d="M10 14h24v3h6v2h2v8h-2v2h-6v3h-2v2H12v-2h-2z"/>
-      </g>
-      <path fill="#fff" d="M34 19h4v2h2v4h-2v2h-4z"/>
-      <path fill="#edf3fb" d="M12 16h20v14h-2v2H14v-2h-2z"/>
-      <path fill="#bed1e7" d="M29 20h3v10h-2v2H14v-2h15z M8 34h32v2H8z"/>
-      <path fill="#633d29" d="M12 16h20v4H12z"/>
-      <path fill="#b47b4e" d="M14 16h16v1H14z"/>
-      <path fill="#fff" d="M14 21h2v7h-2z"/>
-      <path fill="var(--verde)" d="M12 24h20v5H12z"/>
-      <path fill="var(--acento)" d="M14 24h15v3H14z"/>
-      <path fill="#fff" d="M21 24h2v1h1v2h-1v1h-2v-1h-1v-2h1z"/>
-    </svg>`;
-  return { nodo, detener: () => nodo.classList.add('detenida') };
+  const humo = document.createElement('pre');
+  humo.className = 'tz-vapor';
+  let cuadro = 0;
+  // Cada cuadro sube una fila el vapor; al repetirse el patrón parece que el humo ondula hacia arriba.
+  const dibujar = () => {
+    humo.textContent = vapor.map((_, i) => vapor[(i + cuadro) % vapor.length].padEnd(ancho)).join('\n');
+  };
+  dibujar();
+  nodo.append(humo, pintar(taza));
+  let intervalo = null;
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    intervalo = setInterval(() => {
+      // Si la taza ya no está en pantalla, deja de animarse sola.
+      if (cuadro > 2 && !nodo.isConnected) return clearInterval(intervalo);
+      cuadro = (cuadro + 1) % vapor.length;
+      dibujar();
+    }, 180);
+  }
+  return { nodo, detener: () => { clearInterval(intervalo); nodo.classList.add('detenida'); } };
 }

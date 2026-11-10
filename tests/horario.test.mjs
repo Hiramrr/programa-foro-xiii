@@ -74,17 +74,17 @@ test('omitir una actividad no ocupa tiempo', () => {
 
 test('el modo automático sigue en la ponencia con tiempo extra', () => {
   const ahora = t0 + 23 * min;
-  const h = calcularHorario(dia, { a: { inicio: t0 } }, ahora, { esperar: true }).map(a => ({ ...a, recognition: a.key !== 'r' }));
+  const h = calcularHorario(dia, { a: { inicio: t0 } }, ahora, { esperar: true });
   const estado = estadoAutomatico(h, ahora);
   assert.equal(estado.mode, 'contador');
   assert.equal(estado.record.key, 'a');
 });
 
-test('al terminar la ponencia con tiempo extra muestra su diploma y luego la siguiente', () => {
+test('al terminar la ponencia con tiempo extra pasa a la siguiente', () => {
   const fin = t0 + 24 * min;
-  const h = calcularHorario(dia, { a: { inicio: t0, fin } }, fin + 1000, { esperar: true }).map(a => ({ ...a, recognition: true }));
-  assert.equal(estadoAutomatico(h, fin + 1000).mode, 'diploma');
-  assert.equal(estadoAutomatico(h, fin + 15000).record.key, 'b');
+  const h = calcularHorario(dia, { a: { inicio: t0, fin } }, fin + 1000, { esperar: true });
+  assert.equal(estadoAutomatico(h, fin + 1000).mode, 'contador');
+  assert.equal(estadoAutomatico(h, fin + 1000).record.key, 'b');
   assert.equal(h.find(a => a.key === 'b').startMs, fin);
 });
 

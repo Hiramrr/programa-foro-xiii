@@ -1,5 +1,5 @@
 // Fuente: cartel final del XIII Foro (formato tabloide).
-// `speaker` es el nombre que va en el diploma; `institucion` solo se muestra junto al nombre.
+// `speaker` es el nombre del participante (se usa en los aplausos); `institucion` solo se muestra junto al nombre.
 export const programa = {
   jueves: {
     label: 'Jueves 12 de noviembre',

@@ -3,7 +3,6 @@ import { hitosEntre } from './hitos.mjs?v=8';
 
 const $ = selector => document.querySelector(selector);
 const marco = $('#marco');
-const storageKey = 'xiii-foro-diplomas-prueba';
 const zona = 6 * 3600000;
 const antes = 4000;
 const nombres = {
@@ -11,13 +10,9 @@ const nombres = {
   fin: 'Aplausos', sesion: 'Sesión completada', mitad: 'Mitad del foro', 'fin-dia': 'Fin de día', 'fin-foro': 'Fin del foro'
 };
 
-// Mismos registros que arma app.js, con lo necesario para hitos y diplomas.
+// Mismos registros que arma app.js, con lo necesario para los hitos.
 const registros = Object.entries(programa).flatMap(([day, data]) => data.activities.map(activity => ({
   ...activity, day, key: `${day}-${activity.start}`,
-  role: activity.kind === 'break' || ['Inauguración', 'Clausura'].includes(activity.title) ? null
-    : activity.title.startsWith('Conferencia magistral') ? 'Conferencista'
-    : activity.title.startsWith('Panel:') ? 'Panelista'
-    : activity.title === 'Presentación de carteles' ? 'Expositor' : 'Ponente',
   startMs: Date.parse(`${data.date}T${activity.start}:00-06:00`),
   endMs: Date.parse(`${data.date}T${activity.end}:00-06:00`)
 })));
@@ -37,14 +32,6 @@ function abrir(ms, accion) {
 
 const ahoraSimulado = () => marco.contentWindow?.Date.now() ?? Date.now();
 const pulsar = selector => doc => doc.querySelector(selector)?.click();
-
-function leerDiplomas() {
-  try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
-}
-function guardarDiplomas(drafts) {
-  localStorage.setItem(storageKey, JSON.stringify(drafts));
-}
-const diplomaDe = r => ({ name: r.speaker && !/^(Estudiantes|Participantes|Moderan)/.test(r.speaker) ? r.speaker : `Participante de prueba (${r.start})`, role: r.role });
 
 // Reloj
 setInterval(() => {
@@ -94,7 +81,7 @@ document.querySelectorAll('[data-contador]').forEach(boton => boton.addEventList
 // Modos
 const automatico = {
   arranque: registro('jueves-09:10').startMs - 10000,
-  diploma: magistral.endMs - 8000,
+  termina: magistral.endMs - 8000,
   cierre: registro('viernes-14:10').endMs - 8000
 };
 document.querySelectorAll('[data-auto]').forEach(boton => boton.addEventListener('click', () => abrir(automatico[boton.dataset.auto], pulsar('#modo-automatico'))));
@@ -108,20 +95,3 @@ const receso = {
   automatico: () => abrir(descanso.startMs - 6000, pulsar('#modo-automatico'))
 };
 document.querySelectorAll('[data-receso]').forEach(boton => boton.addEventListener('click', receso[boton.dataset.receso]));
-
-// Diplomas (solo en el almacenamiento de prueba)
-const conRol = registros.filter(r => r.role);
-const jueves = registro('jueves-09:10').startMs - 60000;
-$('#diploma-preparar').addEventListener('click', () => abrir(jueves, pulsar(`[data-action="preparar"][data-key="${magistral.key}"]`)));
-$('#diploma-mostrar').addEventListener('click', () => {
-  guardarDiplomas({ ...leerDiplomas(), [magistral.key]: diplomaDe(magistral) });
-  abrir(jueves, pulsar(`[data-action="mostrar"][data-key="${magistral.key}"]`));
-});
-$('#diploma-ultimo').addEventListener('click', () => {
-  guardarDiplomas(Object.fromEntries(conRol.filter(r => r !== magistral).map(r => [r.key, diplomaDe(r)])));
-  abrir(jueves, pulsar(`[data-action="preparar"][data-key="${magistral.key}"]`));
-});
-$('#diploma-borrar').addEventListener('click', () => {
-  localStorage.removeItem(storageKey);
-  abrir(jueves);
-});

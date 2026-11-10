@@ -1,15 +1,13 @@
 import { simulado } from './reloj.js?v=9';
 import { programa } from './programa.js?v=2';
-import { estadoActividad, estadoAutomatico, calcularHorario, desglose } from './contador.mjs?v=11';
+import { estadoActividad, estadoAutomatico, calcularHorario, desglose } from './contador.mjs?v=12';
 import { hitosEntre } from './hitos.mjs?v=8';
-import { artes, festejar, iniciarFestejos, pausarFestejos } from './festejos.js?v=9';
+import { artes, festejar, iniciarFestejos } from './festejos.js?v=10';
 import { transicion } from './transicion.js?v=8';
-import { tazaAnimada } from './receso.js?v=10';
+import { tazaAnimada } from './receso.js?v=11';
 
 const $ = selector => document.querySelector(selector);
-const roles = ['Ponente', 'Conferencista', 'Panelista', 'Expositor'];
-// Con reloj simulado (pruebas.html) los diplomas y los ajustes de horario se guardan aparte para no tocar los reales.
-const storageKey = simulado ? 'xiii-foro-diplomas-prueba' : 'xiii-foro-diplomas-v1';
+// Con reloj simulado (pruebas.html) los ajustes de horario se guardan aparte para no tocar los reales.
 const horarioKey = simulado ? 'xiii-foro-horario-prueba' : 'xiii-foro-horario-v1';
 const controlKey = 'xiii-foro-control-v1';
 const minuto = 60000;
@@ -21,13 +19,9 @@ const hoy = ms => formatoFecha.format(ms);
 const records = new Map();
 for (const [day, data] of Object.entries(programa)) {
   for (const activity of data.activities) {
-    const role = activity.kind === 'break' || ['Inauguración', 'Clausura'].includes(activity.title) ? null
-      : activity.title.startsWith('Conferencia magistral') ? 'Conferencista'
-      : activity.title.startsWith('Panel:') ? 'Panelista'
-      : activity.title === 'Presentación de carteles' ? 'Expositor' : 'Ponente';
     const key = `${day}-${activity.start}`;
-    records.set(key, { ...activity, key, day, role,
-      // En pantalla se muestra la institución; el diploma lleva solo el nombre.
+    records.set(key, { ...activity, key, day,
+      // En pantalla se muestra la institución; el agradecimiento lleva solo el nombre.
       speaker: [activity.speaker, activity.institucion].filter(Boolean).join(' · '),
       recipient: /^(Estudiantes|Participantes|Moderan)/.test(activity.speaker || '') ? '' : activity.speaker || '',
       startMs: Date.parse(`${data.date}T${activity.start}:00-06:00`),
@@ -46,21 +40,13 @@ function guardar(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
 }
 
-function leerDiplomas() {
-  const valid = {};
-  for (const [key, value] of Object.entries(leer(storageKey))) {
-    if (records.has(key) && value && typeof value.name === 'string' && value.name.trim() && value.name.length <= 100 && roles.includes(value.role)) valid[key] = value;
-  }
-  return valid;
-}
-
 function leerAjustes() {
   const valid = {};
   for (const [key, value] of Object.entries(leer(horarioKey))) {
     if (!records.has(key) || !value || typeof value !== 'object') continue;
     const ajuste = {};
     for (const campo of ['inicio', 'fin', 'extra']) if (Number.isFinite(value[campo])) ajuste[campo] = value[campo];
-    for (const campo of ['omitida', 'diplomaVisto']) if (value[campo] === true) ajuste[campo] = true;
+    if (value.omitida === true) ajuste.omitida = true;
     if (Object.keys(ajuste).length) valid[key] = ajuste;
   }
   return valid;
@@ -68,10 +54,9 @@ function leerAjustes() {
 
 function leerControl() {
   const stored = leer(controlKey);
-  return { activo: stored.activo === true, esperar: stored.esperar !== false, diploma: [15, 30, 60, 120].includes(stored.diploma) ? stored.diploma : 15 };
+  return { activo: stored.activo === true, esperar: stored.esperar !== false };
 }
 
-let drafts = leerDiplomas();
 let control = leerControl();
 // El horario real: el programa más los ajustes del operador (retrasos, finales anticipados, omisiones).
 const real = { lista: [...records.values()], ajustes: leerAjustes(), historial: [], persistente: true };
@@ -80,7 +65,6 @@ let day = Object.keys(programa).find(key => programa[key].date === hoy(Date.now(
 let filas = [];
 let vista = null;
 let panelClock = null;
-let editing = null;
 let lastTrigger = null;
 let hadFullscreen = false;
 let controlsTimeout;
@@ -227,19 +211,21 @@ function updateFila(fila, record, now) {
   }
 }
 
-function setControlesTiempo(grupo, record, now, timeline, { diploma = false, permitido = true } = {}) {
+function setControlesTiempo(grupo, record, now, timeline, { permitido = true } = {}) {
   const estado = record ? estadoDe(record, now) : 'despues';
   const curso = estado === 'durante' || estado === 'extra';
   const botones = accion => [...grupo.querySelectorAll(`[data-control="${accion}"]`)];
-  botones('ajustar').forEach(button => {
-    button.hidden = diploma;
-    button.disabled = !permitido || !(curso || estado === 'antes');
+  const ajustable = permitido && (curso || estado === 'antes');
+  [...botones('ajustar'), ...botones('personalizado')].forEach(button => { button.disabled = !ajustable; });
+  // Antes de empezar, sumar o restar minutos mueve el inicio; en curso cambia la hora de término.
+  grupo.querySelectorAll('[data-que-ajusta]').forEach(nodo => {
+    nodo.textContent = curso ? 'Cambiar la hora de término' : 'Mover la hora de inicio';
   });
   const [avanzar] = botones('avanzar');
-  avanzar.textContent = diploma ? 'Continuar' : curso ? 'Terminar ahora' : 'Iniciar ahora';
-  avanzar.disabled = !permitido || !(diploma || curso || estado === 'antes' || estado === 'espera');
+  avanzar.textContent = curso ? '■ Terminar ahora' : '▶ Iniciar ahora';
+  avanzar.disabled = !permitido || !(curso || estado === 'antes' || estado === 'espera');
   const [reiniciar] = botones('reiniciar');
-  reiniciar.hidden = diploma || !curso;
+  reiniciar.hidden = !curso;
   reiniciar.disabled = !permitido;
   botones('deshacer')[0].disabled = !timeline.historial.length;
 }
@@ -251,7 +237,6 @@ function updateEnVivo(lista, now) {
   const permitido = Boolean(record) && editable(real, record, now);
   setControlesTiempo($('#ajustes-tiempo'), record, now, real, { permitido });
   $('#nota-control').hidden = !record || permitido;
-  $('#ocultar-diploma').hidden = estadoAutomatico(eventosAuto(real, lista), now, duracionDiploma(real)).mode !== 'diploma';
   if (!record) {
     panelClock = null;
     $('#en-vivo-reloj').replaceChildren();
@@ -268,7 +253,7 @@ function updateEnVivo(lista, now) {
   panelClock.record = record;
   updateClock(panelClock, now);
   const estado = estadoDe(record, now);
-  $('#en-vivo-estado').textContent = `${{ durante: 'En curso', extra: 'Tiempo cumplido', antes: 'Siguiente', espera: 'Siguiente' }[estado]} · ${hora(record.startMs)} a ${hora(record.endMs)}`;
+  $('#en-vivo-estado').textContent = `${{ durante: '● En curso', extra: '● Tiempo cumplido', antes: 'Siguiente', espera: 'Siguiente' }[estado]} · ${hora(record.startMs)} a ${record.tiempoExtra ? 'ya' : hora(record.endMs)}`;
   $('#en-vivo-titulo').textContent = record.title;
   $('#en-vivo-ponente').textContent = record.speaker || '';
   $('#en-vivo-ponente').hidden = !record.speaker;
@@ -281,11 +266,10 @@ function updateVista(now) {
   const grupo = $('#proyeccion-tiempo');
   const lista = vista ? horario(vista.timeline, now) : [];
   const record = lista.find(r => r.key === vista?.key);
-  const diploma = vista?.mode === 'diploma';
-  const activos = Boolean(record) && control.activo && (!diploma || Boolean(automatic)) && editable(vista.timeline, record, now);
+  const activos = Boolean(record) && control.activo && editable(vista.timeline, record, now);
   grupo.hidden = !activos;
   $('#atajos').hidden = !activos;
-  if (activos) setControlesTiempo(grupo, record, now, vista.timeline, { diploma });
+  if (activos) setControlesTiempo(grupo, record, now, vista.timeline);
   if (!record || !vista.clock) return;
   vista.clock.record = record;
   updateClock(vista.clock, now);
@@ -308,11 +292,10 @@ function terminarReceso(now) {
   transicion(() => proxima ? showProjection(records.get(proxima.key), 'contador') : closeProjection(), '[ siguiente actividad ]');
 }
 
-// El receso tiene su propia pantalla, salvo en modo automático (que ya la muestra) o encima de un diploma o del formulario.
+// El receso tiene su propia pantalla, salvo en modo automático (que ya la muestra).
 function abrirReceso(hito) {
   if (automatic) return;
-  if ($('#diploma-dialog').open || (!$('#proyeccion').hidden && vista?.mode === 'diploma')) festejar(festejoPara(hito));
-  else transicion(() => showProjection(records.get(hito.record.key), 'receso'), '[ receso ]');
+  transicion(() => showProjection(records.get(hito.record.key), 'receso'), '[ receso ]');
 }
 
 // Las actividades omitidas no se festejan; la que está en tiempo extra todavía no termina
@@ -356,7 +339,7 @@ function rotuloHito(hito) {
 
 function festejoPara(hito) {
   const record = hito.record;
-  const name = drafts[record.key]?.name || record.recipient;
+  const name = record.recipient;
   const progreso = [hito.completadas, hito.total];
   const [sessionName, sessionTopic] = (record.session || '').split(' · ');
   switch (hito.tipo) {
@@ -373,17 +356,6 @@ function festejoPara(hito) {
   }
 }
 
-function diplomaFor(record) {
-  return drafts[record.key] || (record.recipient && record.role ? { name: record.recipient, role: record.role } : null);
-}
-
-function eventosAuto(timeline, lista) {
-  return lista.filter(r => !r.omitida)
-    .map(r => ({ ...r, recognition: Boolean(diplomaFor(r)) && !timeline.ajustes[r.key]?.diplomaVisto }));
-}
-
-const duracionDiploma = timeline => timeline.persistente ? control.diploma * 1000 : 10000;
-
 // La prueba termina seis segundos después de que arranca la segunda conferencia.
 function finPrueba(lista) {
   const ultima = lista.at(-1);
@@ -394,17 +366,14 @@ function advanceAutomatic(now) {
   const { timeline } = automatic;
   const lista = horario(timeline, now);
   const state = automatic.demo && now >= finPrueba(lista) ? { mode: 'fin' }
-    : estadoAutomatico(eventosAuto(timeline, lista), now, duracionDiploma(timeline));
+    : estadoAutomatico(lista.filter(r => !r.omitida), now);
   const key = `${state.mode}:${state.record?.key || ''}`;
   if (automatic.last === key) return;
   const rotulo = !automatic.last ? (automatic.demo ? '[ prueba rápida ]' : '[ modo automático ]')
-    : state.mode === 'diploma' ? '[ reconocimiento ]'
     : state.mode === 'receso' ? '[ receso ]'
     : state.mode === 'contador' ? '[ siguiente actividad ]'
     : automatic.demo ? '[ prueba terminada ]' : '[ programa concluido ]';
   automatic.last = key;
-  // Los aplausos del final esperan a que termine el diploma en lugar de taparlo.
-  if (state.mode === 'diploma') pausarFestejos(true);
   const run = automatic;
   transicion(() => {
     // Si se detuvo el modo automático mientras la pantalla estaba cubierta, no se vuelve a abrir.
@@ -417,9 +386,7 @@ function advanceAutomatic(now) {
 function showAutomaticEnd() {
   vista?.detener?.();
   vista = null;
-  pausarFestejos(false);
   $('#proyeccion').dataset.mode = 'fin';
-  $('#proyeccion-diploma').hidden = true;
   const panel = element('div', 'fin-automatico panel');
   panel.append(element('h2', '', automatic.demo ? 'Prueba terminada' : 'Programa concluido'));
   const actions = element('div', 'acciones-dialog');
@@ -434,23 +401,22 @@ function showAutomaticEnd() {
   close.addEventListener('click', requestClose);
   actions.append(close);
   panel.append(actions);
-  $('#proyeccion-contenido').querySelectorAll('.diploma-frame').forEach(frame => diplomaObserver.unobserve(frame));
   $('#proyeccion-contenido').replaceChildren(panel);
   $('#proyeccion').hidden = false;
   $('#terminal').inert = true;
   document.body.classList.add('proyectando');
   updateVista(Date.now());
   revealControls();
-  if (automatic.demo) festejar({ rotulo: '[ prueba rápida ]', titulo: '¡Todo listo para el foro!', detalle: 'Inicio, conferencia, diploma y siguiente conferencia comprobados.', arte: artes.aplausos, lluvia: true });
+  if (automatic.demo) festejar({ rotulo: '[ prueba rápida ]', titulo: '¡Todo listo para el foro!', detalle: 'Inicio, conferencia, aplausos y siguiente conferencia comprobados.', arte: artes.aplausos, lluvia: true });
 }
 
 function crearPrueba(now) {
-  // Cada animación termina antes del siguiente hito: inicio del foro (8 s), diploma sin nada encima (10 s),
-  // aplausos al volver al contador (5 s) e inicio de la siguiente conferencia (5 s).
+  // Cada animación termina antes del siguiente hito: inicio del foro (8 s), aplausos (5 s)
+  // e inicio de la siguiente conferencia (5 s).
   // Los ajustes de la prueba viven solo en memoria y no tocan el horario real.
-  const [first, second] = [...records.values()].filter(r => r.kind !== 'break' && diplomaFor(r)).slice(0, 2);
+  const [first, second] = [...records.values()].filter(r => r.kind !== 'break' && r.recipient).slice(0, 2);
   return {
-    lista: [{ ...first, startMs: now + 4000, endMs: now + 13000 }, { ...second, startMs: now + 30000, endMs: now + 45000 }],
+    lista: [{ ...first, startMs: now + 4000, endMs: now + 16000 }, { ...second, startMs: now + 24000, endMs: now + 40000 }],
     ajustes: {}, historial: [], persistente: false
   };
 }
@@ -459,7 +425,7 @@ function startAutomatic(demo = false) {
   const now = Date.now();
   automatic = { timeline: demo ? crearPrueba(now) : real, demo, last: '' };
   $('#etiqueta-prueba').hidden = !demo;
-  $('#cerrar-proyeccion').textContent = 'Detener';
+  $('#cerrar-proyeccion').textContent = '✕ Detener (Esc)';
   advanceAutomatic(now);
 }
 
@@ -480,13 +446,12 @@ function renderAgenda() {
       const pause = element('div', 'receso');
       const rotulo = element('span');
       const original = element('span', 'horario-original');
-      pause.append(rotulo, element('h4', '', record.title), original, action('Mostrar receso', 'receso', record.key), omitir);
+      pause.append(rotulo, element('h4', '', record.title), original, action('☕ Proyectar receso', 'receso', record.key), omitir);
       root.append(pause);
       filas.push({ record, row: pause, rotulo, original, omitir });
       continue;
     }
     const row = element('article', 'actividad panel');
-    row.dataset.preparado = String(Boolean(drafts[record.key]));
     const rotulo = element('h3', 'rotulo');
     row.append(rotulo);
     const content = element('div', 'actividad-cuerpo');
@@ -496,11 +461,9 @@ function renderAgenda() {
     const original = element('p', 'horario-original');
     information.append(original);
     const actions = element('div', 'acciones-actividad');
-    actions.append(action('Mostrar contador', 'contador', record.key));
-    if (record.role) {
-      actions.append(action(drafts[record.key] ? 'Mostrar diploma' : 'Preparar diploma', drafts[record.key] ? 'mostrar' : 'preparar', record.key));
-      if (drafts[record.key]) actions.append(action('Editar', 'preparar', record.key));
-    }
+    const proyectar = action('▶ Proyectar contador', 'contador', record.key);
+    proyectar.classList.add('principal');
+    actions.append(proyectar);
     actions.append(omitir);
     information.append(actions);
     const clock = createClock(record);
@@ -517,7 +480,7 @@ function avisar(texto) {
   $('#estado-app').textContent = texto;
   $('#aviso-proyeccion').textContent = texto;
   clearTimeout(avisoTimeout);
-  avisoTimeout = setTimeout(() => { $('#aviso-proyeccion').textContent = ''; }, 3000);
+  avisoTimeout = setTimeout(() => { $('#aviso-proyeccion').textContent = ''; $('#estado-app').textContent = ''; }, 4000);
 }
 
 // Cada ajuste guarda una copia previa para poder deshacerlo.
@@ -542,10 +505,6 @@ function deshacer(timeline) {
   tick();
 }
 
-function ocultarDiploma(timeline, record) {
-  cambiar(timeline, `Diploma de «${record.title}» ocultado.`, ajustes => { ajuste(ajustes, record.key).diplomaVisto = true; });
-}
-
 function ejecutar(accion, origen, valor) {
   const now = Date.now();
   const enProyeccion = origen === 'proyeccion';
@@ -554,20 +513,12 @@ function ejecutar(accion, origen, valor) {
   if (accion === 'deshacer') return deshacer(timeline);
   if (!control.activo) return;
   const lista = horario(timeline, now);
-  if (accion === 'ocultar') {
-    const state = estadoAutomatico(eventosAuto(real, lista), now, duracionDiploma(real));
-    if (state.mode === 'diploma') ocultarDiploma(real, state.record);
-    return;
-  }
   const record = enProyeccion ? lista.find(r => r.key === vista.key) : objetivo(lista, now);
   if (!record || !editable(timeline, record, now)) return;
-  if (enProyeccion && vista.mode === 'diploma') {
-    if (accion === 'avanzar' && automatic) ocultarDiploma(timeline, record);
-    return;
-  }
   const estado = estadoDe(record, now);
   const curso = estado === 'durante' || estado === 'extra';
   if (accion === 'ajustar' && (curso || estado === 'antes')) {
+    if (!valor) return;
     const texto = `${valor > 0 ? '+' : '−'}${Math.abs(valor) / minuto} min`;
     // En curso cambia la duración; antes de empezar mueve el inicio.
     if (curso) cambiar(timeline, `${texto} a «${record.title}».`, ajustes => {
@@ -582,9 +533,8 @@ function ejecutar(accion, origen, valor) {
     cambiar(timeline, `«${record.title}» inició.`, ajustes => {
       for (const r of lista) {
         if (r.day !== record.day || r.key === record.key) continue;
-        // Lo que seguía en curso termina ahora y los diplomas pendientes ya no se muestran.
+        // Lo que seguía en curso termina ahora.
         if (enCurso(r, now)) ajuste(ajustes, r.key).fin = now;
-        else if (estadoDe(r, now) === 'despues' && r.endMs > now - 120000) ajuste(ajustes, r.key).diplomaVisto = true;
       }
       const a = ajuste(ajustes, record.key);
       a.inicio = now;
@@ -605,71 +555,11 @@ function alternarOmitida(key) {
   });
 }
 
-const diplomaObserver = new ResizeObserver(entries => entries.forEach(entry => fitDiploma(entry.target)));
-function fitDiploma(frame) {
-  for (const [selector, ratio] of [['.diploma-nombre', .032], ['.diploma-participacion', .027]]) {
-    const box = frame.querySelector(selector);
-    const span = box.firstElementChild;
-    const max = frame.clientWidth * ratio;
-    span.style.fontSize = `${max}px`;
-    if (span.scrollWidth > box.clientWidth - 4) span.style.fontSize = `${max * (box.clientWidth - 4) / span.scrollWidth}px`;
-  }
-}
-
-function mountDiploma(container, name, role) {
-  container.querySelectorAll('.diploma-frame').forEach(frame => diplomaObserver.unobserve(frame));
-  const frame = $('#diploma-template').content.firstElementChild.cloneNode(true);
-  frame.querySelector('.diploma-nombre span').textContent = name;
-  frame.querySelector('.diploma-participacion span').textContent = role;
-  frame.setAttribute('aria-label', `Reconocimiento para ${name || 'nombre por completar'}, participación como ${role}`);
-  container.replaceChildren(frame);
-  diplomaObserver.observe(frame);
-  fitDiploma(frame);
-}
-
-function previewDiploma() {
-  $('#nombre').setCustomValidity('');
-  mountDiploma($('#diploma-preview'), $('#nombre').value.trim(), $('#participacion').value);
-}
-
-function prepareDiploma(record) {
-  editing = record;
-  const draft = drafts[record.key] || { name: record.recipient, role: record.role };
-  $('#nombre').value = draft.name;
-  $('#participacion').value = draft.role;
-  $('#estado-diploma').textContent = '';
-  $('#diploma-dialog').showModal();
-  previewDiploma();
-}
-
-function saveDiploma() {
-  const name = $('#nombre').value.trim();
-  if (!name) {
-    $('#nombre').setCustomValidity('Escribe el nombre del participante.');
-    $('#nombre').reportValidity();
-    return false;
-  }
-  const isNew = !drafts[editing.key];
-  drafts[editing.key] = { name, role: $('#participacion').value };
-  const persisted = guardar(storageKey, drafts);
-  $('#estado-app').textContent = persisted ? `Diploma preparado para ${name}.` : 'Diploma preparado en esta pestaña. El navegador no permitió guardar los datos para otra visita.';
-  renderAgenda();
-  if (isNew) {
-    const withRole = [...records.values()].filter(record => record.role);
-    const ready = withRole.filter(record => drafts[record.key]).length;
-    festejar(ready === withRole.length
-      ? { rotulo: '[ diplomas completos ]', titulo: '¡Todos los diplomas están listos!', detalle: `${ready} de ${withRole.length} preparados`, arte: artes.diploma, progreso: [ready, withRole.length], lluvia: true }
-      : { rotulo: '[ diploma listo ]', titulo: `Diploma para ${name}`, detalle: `${ready} de ${withRole.length} preparados`, arte: artes.diploma, progreso: [ready, withRole.length] });
-  }
-  return true;
-}
-
 function clearProjection() {
   automatic = null;
   $('#etiqueta-prueba').hidden = true;
-  $('#cerrar-proyeccion').textContent = 'Cerrar';
+  $('#cerrar-proyeccion').textContent = '✕ Salir (Esc)';
   clearTimeout(controlsTimeout);
-  $('#proyeccion-contenido').querySelectorAll('.diploma-frame').forEach(frame => diplomaObserver.unobserve(frame));
   $('#proyeccion-contenido').replaceChildren();
   $('#proyeccion').hidden = true;
   $('#terminal').inert = false;
@@ -678,7 +568,6 @@ function clearProjection() {
   vista = null;
   updateVista(Date.now());
   hadFullscreen = false;
-  pausarFestejos(false);
   mantenerPantalla();
   if (lastTrigger?.isConnected) lastTrigger.focus();
   else $('#titulo-programa').focus();
@@ -698,7 +587,7 @@ async function closeProjection() {
 function revealControls() {
   $('#proyeccion').classList.add('controles-visibles');
   clearTimeout(controlsTimeout);
-  controlsTimeout = setTimeout(() => $('#proyeccion').classList.remove('controles-visibles'), 2500);
+  controlsTimeout = setTimeout(() => $('#proyeccion').classList.remove('controles-visibles'), 4000);
 }
 
 function updateBotonPantalla() {
@@ -734,17 +623,10 @@ async function showProjection(record, mode, timeline = real) {
   vista?.detener?.();
   vista = { key: record.key, mode, timeline, clock: null, siguiente: null };
   projection.dataset.mode = mode;
-  pausarFestejos(mode === 'diploma');
   projection.hidden = false;
   $('#terminal').inert = true;
   document.body.classList.add('proyectando');
-  $('#proyeccion-diploma').hidden = mode === 'diploma' || !record.role;
-  $('#proyeccion-diploma').textContent = drafts[record.key] ? 'Mostrar diploma' : 'Preparar diploma';
-  if (mode === 'diploma') {
-    const draft = diplomaFor(record);
-    mountDiploma(container, draft.name, draft.role);
-  } else if (mode === 'receso') {
-    container.querySelectorAll('.diploma-frame').forEach(frame => diplomaObserver.unobserve(frame));
+  if (mode === 'receso') {
     const taza = tazaAnimada();
     vista.detener = taza.detener;
     const panel = element('div', 'contador-proyectado receso-proyectado panel');
@@ -754,7 +636,6 @@ async function showProjection(record, mode, timeline = real) {
     panel.append(vista.clock.root, vista.siguiente, element('p', 'receso-mensaje', 'Estira las piernas, toma agua y regresa a tiempo.'));
     container.replaceChildren(panel);
   } else {
-    container.querySelectorAll('.diploma-frame').forEach(frame => diplomaObserver.unobserve(frame));
     const panel = element('div', 'contador-proyectado panel');
     panel.append(element('h2', '', record.title));
     if (record.speaker) panel.append(element('p', 'ponente', record.speaker));
@@ -767,9 +648,7 @@ async function showProjection(record, mode, timeline = real) {
   updateBotonPantalla();
   projection.focus();
   mantenerPantalla();
-  // Sobre el diploma los controles solo aparecen al mover el puntero o tocar la pantalla.
-  if (mode === 'diploma') { clearTimeout(controlsTimeout); projection.classList.remove('controles-visibles'); }
-  else revealControls();
+  revealControls();
   // Solo se pide pantalla completa al abrir; si el operador la dejó, los cambios automáticos no la recuperan.
   if (!abierta && !automatic?.demo) await pantallaCompleta();
 }
@@ -780,29 +659,24 @@ $('#actividades').addEventListener('click', event => {
   lastTrigger = button;
   const record = records.get(button.dataset.key);
   if (button.dataset.action === 'contador') transicion(() => showProjection(record, 'contador'), '[ contador ]');
-  else if (button.dataset.action === 'mostrar') transicion(() => showProjection(record, 'diploma'), '[ reconocimiento ]');
   else if (button.dataset.action === 'receso') transicion(() => showProjection(record, 'receso'), '[ receso ]');
   else if (button.dataset.action === 'omitir') alternarOmitida(record.key);
-  else prepareDiploma(record);
 });
 document.addEventListener('click', event => {
   const button = event.target.closest('button[data-control]');
-  if (button) ejecutar(button.dataset.control, button.closest('#proyeccion') ? 'proyeccion' : 'panel', Number(button.dataset.valor));
+  if (!button) return;
+  const origen = button.closest('#proyeccion') ? 'proyeccion' : 'panel';
+  if (button.dataset.control === 'personalizado') {
+    // Minutos escritos por el operador: «Quitar» resta y «Agregar» suma.
+    const campo = button.closest('[role="group"]').querySelector('.minutos-libres');
+    const minutos = Math.round(Number(campo.value));
+    if (!(minutos >= 1 && minutos <= 180)) { campo.focus(); return avisar('Escribe cuántos minutos (de 1 a 180).'); }
+    return ejecutar('ajustar', origen, Number(button.dataset.signo) * minutos * minuto);
+  }
+  ejecutar(button.dataset.control, origen, Number(button.dataset.valor));
 });
 document.querySelectorAll('[data-day]').forEach(button => button.addEventListener('click', () => { day = button.dataset.day; renderAgenda(); }));
 $('#buscar').addEventListener('input', renderAgenda);
-$('#cerrar-dialog').addEventListener('click', () => $('#diploma-dialog').close());
-$('#nombre').addEventListener('input', previewDiploma);
-$('#participacion').addEventListener('change', previewDiploma);
-$('#diploma-form').addEventListener('submit', event => {
-  event.preventDefault();
-  if (!saveDiploma()) return;
-  const record = editing;
-  $('#diploma-dialog').close();
-  lastTrigger = document.querySelector(`[data-key="${record.key}"][data-action="mostrar"]`);
-  if (event.submitter?.value === 'mostrar') transicion(() => showProjection(record, 'diploma'), '[ reconocimiento ]');
-  else lastTrigger?.focus();
-});
 $('#cerrar-proyeccion').addEventListener('click', requestClose);
 $('#pantalla-completa').addEventListener('click', pantallaCompleta);
 $('#modo-automatico').addEventListener('click', event => { lastTrigger = event.currentTarget; startAutomatic(); });
@@ -815,26 +689,17 @@ $('#control-tiempos').addEventListener('click', () => {
   avisar(control.activo ? 'Control de tiempos activado.' : 'Control de tiempos desactivado.');
 });
 $('#pref-esperar').addEventListener('change', event => { control.esperar = event.target.value === 'esperar'; guardar(controlKey, control); tick(); });
-$('#pref-diploma').addEventListener('change', event => { control.diploma = Number(event.target.value); guardar(controlKey, control); tick(); });
 $('#restablecer').addEventListener('click', () => {
   if (!Object.keys(real.ajustes).length) return avisar('El horario ya coincide con el programa.');
+  if (!confirm('¿Volver al horario original? Se quitan todos los ajustes (puedes deshacerlo).')) return;
   cambiar(real, 'Horario restablecido al programa original. Puedes deshacerlo.', ajustes => { for (const key of Object.keys(ajustes)) delete ajustes[key]; });
 });
 $('#proyeccion').addEventListener('pointermove', revealControls);
 $('#proyeccion').addEventListener('pointerdown', revealControls);
-$('#proyeccion-diploma').addEventListener('click', async () => {
-  const record = records.get(vista.key);
-  automatic = null;
-  $('#etiqueta-prueba').hidden = true;
-  $('#cerrar-proyeccion').textContent = 'Cerrar';
-  if (drafts[record.key]) transicion(() => showProjection(record, 'diploma'), '[ reconocimiento ]');
-  else { await transicion(closeProjection, '[ programa ]'); prepareDiploma(record); }
-});
-
 // Atajos durante la proyección. Las flechas y avance/retroceso de página permiten usar un presentador inalámbrico.
 const atajos = { arrowright: 'avanzar', pagedown: 'avanzar', n: 'avanzar', arrowleft: 'deshacer', pageup: 'deshacer', z: 'deshacer', r: 'reiniciar', arrowup: 'mas', '+': 'mas', '=': 'mas', arrowdown: 'menos', '-': 'menos' };
 document.addEventListener('keydown', event => {
-  if ($('#proyeccion').hidden || $('#diploma-dialog').open) return;
+  if ($('#proyeccion').hidden) return;
   if (event.key === 'Escape') { event.preventDefault(); requestClose(); return; }
   if (event.altKey || event.target.closest?.('input, select, textarea')) return;
   const tecla = event.key.toLowerCase();
@@ -860,13 +725,12 @@ document.addEventListener('visibilitychange', () => { tick(); mantenerPantalla()
 window.addEventListener('storage', event => {
   if (event.key === horarioKey) { real.ajustes = leerAjustes(); tick(); }
   else if (event.key === controlKey) { control = leerControl(); aplicarControl(); renderAgenda(); }
-  else if (event.key === storageKey) { drafts = leerDiplomas(); renderAgenda(); }
 });
 
 function aplicarControl() {
   $('#control-tiempos').setAttribute('aria-pressed', String(control.activo));
+  $('#control-tiempos-texto').textContent = control.activo ? 'Ocultar control de tiempos' : 'Abrir control de tiempos';
   $('#pref-esperar').value = control.esperar ? 'esperar' : 'avanzar';
-  $('#pref-diploma').value = String(control.diploma);
   mantenerPantalla();
 }
 
