@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Programa · XIII Foro de Ciencias de la Computación</title>
-  <meta name="description" content="Programa del XIII Foro de Ciencias de la Computación, con cuentas regresivas por conferencia y preparación de reconocimientos. 12 y 13 de noviembre de 2026.">
+  <meta name="description" content="Programa del XIII Foro de Ciencias de la Computación, con cuentas regresivas por conferencia. 12 y 13 de noviembre de 2026.">
   <meta name="theme-color" content="#ffffff">
   <link rel="canonical" href="https://hiramrr.github.io/programa-foro-xiii/">
-  <link rel="stylesheet" href="styles.css?v=13">
-  <script type="module" src="app.js?v=14"></script>
+  <link rel="stylesheet" href="styles.css?v=14">
+  <script type="module" src="app.js?v=15"></script>
 </head>
 <body>
   <div class="decor-lateral izquierda" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
@@ -28,10 +28,32 @@
 
     <section id="programa" aria-label="Programa por día">
       <div class="modos">
-        <button id="modo-automatico" type="button">Modo automático</button>
-        <button id="prueba-rapida" type="button">Prueba rápida</button>
-        <button id="control-tiempos" type="button" aria-pressed="false" aria-controls="en-vivo">Control de tiempos</button>
+        <button id="modo-automatico" type="button" class="modo">
+          <span class="modo-icono" aria-hidden="true">▶</span>
+          <strong>Proyectar en automático</strong>
+          <small>Sigue el horario solo: contador, recesos y siguiente actividad.</small>
+        </button>
+        <button id="control-tiempos" type="button" class="modo" aria-pressed="false" aria-controls="en-vivo">
+          <span class="modo-icono" aria-hidden="true">⏱</span>
+          <strong id="control-tiempos-texto">Abrir control de tiempos</strong>
+          <small>Agrega o quita minutos, termina o inicia actividades.</small>
+        </button>
+        <button id="prueba-rapida" type="button" class="modo">
+          <span class="modo-icono" aria-hidden="true">✓</span>
+          <strong>Ensayo de 40 segundos</strong>
+          <small>Prueba que todo funcione sin tocar el horario real.</small>
+        </button>
       </div>
+      <details class="guia panel">
+        <summary>¿Cómo se usa? Guía rápida</summary>
+        <ol>
+          <li><strong>En la computadora del proyector</strong>, pulsa «Proyectar en automático». La pantalla cambia sola de actividad.</li>
+          <li><strong>Si alguien se tarda más o termina antes</strong>, pulsa «Abrir control de tiempos» (en esta misma pestaña o en otra pestaña del mismo navegador) y usa <strong>+ / −</strong> minutos o «Terminar ahora».</li>
+          <li><strong>Si te equivocas</strong>, pulsa «↶ Deshacer». Nada se pierde.</li>
+          <li><strong>Para salir</strong> de la pantalla completa pulsa <kbd>Esc</kbd> o mueve el ratón y pulsa «Salir».</li>
+        </ol>
+        <p>Atajos durante la proyección: <kbd>→</kbd> terminar/iniciar · <kbd>↑</kbd> +1 min · <kbd>↓</kbd> −1 min · <kbd>Mayús</kbd>+flecha ±5 min · <kbd>←</kbd> deshacer · <kbd>F</kbd> pantalla completa.</p>
+      </details>
       <section class="en-vivo panel" id="en-vivo" aria-labelledby="en-vivo-rotulo" hidden>
         <h2 class="rotulo" id="en-vivo-rotulo">[ control de tiempos ]</h2>
         <div class="en-vivo-cuerpo">
@@ -44,19 +66,34 @@
           <div id="en-vivo-reloj"></div>
         </div>
         <div class="ajustes-tiempo" id="ajustes-tiempo" role="group" aria-label="Ajustar el tiempo de la actividad">
-          <button type="button" data-control="ajustar" data-valor="-60000">−1 min</button>
-          <button type="button" data-control="ajustar" data-valor="60000">+1 min</button>
-          <button type="button" data-control="ajustar" data-valor="300000">+5 min</button>
-          <button type="button" data-control="avanzar" class="principal">Terminar ahora</button>
-          <button type="button" data-control="reiniciar">Reiniciar desde ahora</button>
-          <button type="button" data-control="ocultar" id="ocultar-diploma" hidden>Ocultar diploma</button>
-          <button type="button" data-control="deshacer">Deshacer</button>
+          <div class="grupo-tiempo">
+            <p class="grupo-titulo" data-que-ajusta>Cambiar la hora de término</p>
+            <div class="botones-tiempo">
+              <button type="button" data-control="ajustar" data-valor="-300000" class="menos">−5 min</button>
+              <button type="button" data-control="ajustar" data-valor="-60000" class="menos">−1 min</button>
+              <button type="button" data-control="ajustar" data-valor="60000" class="mas">+1 min</button>
+              <button type="button" data-control="ajustar" data-valor="300000" class="mas">+5 min</button>
+              <button type="button" data-control="ajustar" data-valor="600000" class="mas">+10 min</button>
+            </div>
+            <div class="tiempo-libre">
+              <label>Otra cantidad <input class="minutos-libres" type="number" inputmode="numeric" min="1" max="180" value="2" aria-label="Minutos"> min</label>
+              <button type="button" data-control="personalizado" data-signo="-1" class="menos">− Quitar</button>
+              <button type="button" data-control="personalizado" data-signo="1" class="mas">+ Agregar</button>
+            </div>
+          </div>
+          <div class="grupo-tiempo">
+            <p class="grupo-titulo">Acciones</p>
+            <div class="botones-tiempo">
+              <button type="button" data-control="avanzar" class="principal grande">■ Terminar ahora</button>
+              <button type="button" data-control="reiniciar">⟲ Reiniciar desde cero</button>
+              <button type="button" data-control="deshacer">↶ Deshacer</button>
+            </div>
+          </div>
         </div>
         <p class="nota-control" id="nota-control" hidden>Los ajustes se habilitan el día del evento. Usa «Prueba rápida» para ensayarlos.</p>
         <div class="preferencias">
-          <label>Al agotarse el tiempo<select id="pref-esperar"><option value="esperar">Esperar a que termine</option><option value="avanzar">Avanzar automáticamente</option></select></label>
-          <label>Diploma en pantalla<select id="pref-diploma"><option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option></select></label>
-          <button id="restablecer" type="button">Restablecer horario</button>
+          <label>Al agotarse el tiempo<select id="pref-esperar"><option value="esperar">Esperar a que yo pulse «Terminar ahora»</option><option value="avanzar">Pasar sola a la siguiente actividad</option></select></label>
+          <button id="restablecer" type="button">Volver al horario original</button>
         </div>
       </section>
       <div class="controles" id="controles" hidden>
@@ -77,51 +114,25 @@
     <footer class="pie"><a href="assets/programa-foro.pdf" download>Programa en PDF</a></footer>
   </main>
 
-  <dialog id="diploma-dialog" aria-labelledby="diploma-titulo">
-    <form id="diploma-form">
-      <div class="dialog-heading">
-        <h2 id="diploma-titulo">Preparar diploma</h2>
-        <button id="cerrar-dialog" type="button">Cerrar</button>
-      </div>
-      <div class="campos-diploma">
-        <label>Nombre completo<input id="nombre" type="text" required maxlength="100" autocomplete="off"></label>
-        <label>Participación<select id="participacion"><option>Ponente</option><option>Conferencista</option><option>Panelista</option><option>Expositor</option></select></label>
-      </div>
-      <div id="diploma-preview"></div>
-      <p id="estado-diploma" role="status"></p>
-      <div class="acciones-dialog">
-        <button type="submit" name="accion" value="guardar" class="principal">Guardar preparado</button>
-        <button type="submit" name="accion" value="mostrar">Mostrar diploma</button>
-      </div>
-    </form>
-  </dialog>
-
   <section id="proyeccion" tabindex="-1" aria-label="Presentación en pantalla" hidden>
     <span id="etiqueta-prueba" hidden>[ prueba rápida ]</span>
     <div class="proyeccion-controles">
       <div class="proyeccion-tiempo" id="proyeccion-tiempo" role="group" aria-label="Ajustar el tiempo de la actividad" hidden>
-        <button type="button" data-control="ajustar" data-valor="-60000">−1 min</button>
-        <button type="button" data-control="ajustar" data-valor="60000">+1 min</button>
-        <button type="button" data-control="ajustar" data-valor="300000">+5 min</button>
-        <button type="button" data-control="avanzar" class="principal">Terminar ahora</button>
-        <button type="button" data-control="reiniciar">Reiniciar</button>
-        <button type="button" data-control="deshacer">Deshacer</button>
+        <button type="button" data-control="ajustar" data-valor="-300000" class="menos">−5 min</button>
+        <button type="button" data-control="ajustar" data-valor="-60000" class="menos">−1 min</button>
+        <button type="button" data-control="ajustar" data-valor="60000" class="mas">+1 min</button>
+        <button type="button" data-control="ajustar" data-valor="300000" class="mas">+5 min</button>
+        <button type="button" data-control="avanzar" class="principal">■ Terminar ahora</button>
+        <button type="button" data-control="reiniciar">⟲ Reiniciar</button>
+        <button type="button" data-control="deshacer">↶ Deshacer</button>
       </div>
-      <button id="pantalla-completa" type="button" hidden>Pantalla completa</button>
-      <button id="proyeccion-diploma" type="button" hidden>Preparar diploma</button>
-      <button id="cerrar-proyeccion" type="button">Cerrar</button>
-      <p class="atajos" id="atajos" hidden>→ siguiente · ↑ ↓ ±1 min (⇧ ±5) · R reiniciar · ← deshacer · F pantalla completa · Esc salir</p>
+      <button id="pantalla-completa" type="button" hidden>⛶ Pantalla completa</button>
+      <button id="cerrar-proyeccion" type="button" class="salir">✕ Salir (Esc)</button>
+      <p class="atajos" id="atajos" hidden>→ terminar/iniciar · ↑ ↓ ±1 min (Mayús ±5) · ← deshacer · F pantalla completa · Esc salir</p>
     </div>
     <div id="proyeccion-contenido"></div>
     <p class="aviso-proyeccion" id="aviso-proyeccion" role="status"></p>
   </section>
 
-  <template id="diploma-template">
-    <div class="diploma-frame" role="img">
-      <img src="assets/diploma-original.png" width="2000" height="1414" alt="">
-      <div class="diploma-nombre"><span></span></div>
-      <div class="diploma-participacion"><span></span></div>
-    </div>
-  </template>
 </body>
 </html>

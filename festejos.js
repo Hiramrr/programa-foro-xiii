@@ -1,4 +1,4 @@
-import { tazaAnimada } from './receso.js?v=10';
+import { tazaAnimada } from './receso.js?v=11';
 
 const simbolos = [...'*+·•✦✧×◆◇▪░▒'];
 const tintes = ['azul', 'verde', 'acento'];
@@ -27,7 +27,6 @@ export const artes = {
   aplausos: { ms: 260, columnas: [['\\o/  \\o/  \\o/', '_o_  \\o/  _o_', '\\o/  _o_  \\o/', '_o_  _o_  _o_']] },
   cafe: { crear: tazaAnimada },
   estrellas: { ms: 300, columnas: [['·   ✦   ·   ✦', '✦   ·   ✦   ·', '·   ✧   ·   ✧']] },
-  diploma: { ms: 360, columnas: [['┌────────┐\n│ ~~~~~~ │\n│ ~~~~ ✦ │\n└────────┘', '┌────────┐\n│ ~~~~~~ │\n│ ~~~~ ✧ │\n└────────┘']] },
   fuegos: { ms: 150, columnas: [0, 4, 7].map(fase => cohete.map((_, i) => cohete[(i + fase) % cohete.length])) },
   sesion: ponencias => ({
     ms: 280,
@@ -50,7 +49,7 @@ export function iniciarFestejos(region) {
   });
 }
 
-// En pausa nada se dibuja encima (por ejemplo, del diploma); los festejos esperan en la cola.
+// En pausa nada se dibuja encima ; los festejos esperan en la cola.
 export function pausarFestejos(pausa) {
   if (pausado === pausa) return;
   pausado = pausa;

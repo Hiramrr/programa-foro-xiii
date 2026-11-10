@@ -43,10 +43,7 @@ export function calcularHorario(actividades, ajustes = {}, ahora = Date.now(), {
   });
 }
 
-export function estadoAutomatico(actividades, ahora, diplomaMs = 15000) {
-  const ultima = actividades.filter(a => a.recognition && !a.tiempoExtra && a.endMs <= ahora)
-    .reduce((last, a) => !last || a.endMs > last.endMs ? a : last, null);
-  if (ultima && ahora < ultima.endMs + diplomaMs) return { mode: 'diploma', record: ultima };
+export function estadoAutomatico(actividades, ahora) {
   const actual = actividades.find(a => !a.enEspera && a.startMs <= ahora && (a.tiempoExtra || ahora < a.endMs));
   // Durante un receso se muestra su pantalla; antes de él, el contador apunta a la siguiente actividad real.
   const siguiente = actividades.find(a => a.kind !== 'break' && (a.startMs > ahora || a.enEspera));
