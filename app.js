@@ -14,6 +14,17 @@ const controlKey = 'xiii-foro-control-v1';
 // Canal de ntfy.sh por el que se comparten los ajustes con todas las pantallas. Con reloj simulado se usa otro.
 const canal = 'xiii-foro-dcc-2026-b86c97c36ea85009' + (simulado ? '-prueba' : '');
 const syncKey = simulado ? 'xiii-foro-sync-prueba' : 'xiii-foro-sync-v1';
+const codigoKey = simulado ? 'xiii-foro-codigo-prueba' : 'xiii-foro-codigo-v1';
+// Códigos QR que se pueden poner en grande en todas las pantallas.
+const codigos = [
+  { id: 'registro', titulo: 'Registro al foro', detalle: 'También sale solo antes de cada conferencia.', imagen: 'assets/qr-registro.png', ancho: 960, alto: 1610 },
+  { id: 'opinion', titulo: 'Opinión de conferencias', detalle: 'Para que el público opine de cada conferencia.', imagen: 'assets/qr-opinion-conferencias.png', ancho: 1105, alto: 1430 },
+  { id: 'general', titulo: 'Evaluación general del foro', detalle: 'Ideal al cierre de cada día o en la clausura.', imagen: 'assets/qr-evaluacion-general.png', ancho: 1105, alto: 1430 },
+  { id: 'carteles', titulo: 'Evaluación de carteles', detalle: 'Durante la presentación de carteles.', imagen: 'assets/qr-evaluacion-carteles.png', ancho: 1105, alto: 1430 }
+];
+const codigoPorId = id => codigos.find(c => c.id === id) || null;
+// El código que está en grande en las pantallas (o null).
+let codigoEnPantalla = codigoPorId(leer(codigoKey).id)?.id || null;
 const minuto = 60000;
 // El QR de registro se muestra antes de cada conferencia y durante sus primeros minutos.
 const qrMinutos = 5;
@@ -549,7 +560,60 @@ let ultimoSync = Number(leer(syncKey).at) || 0;
 function compartir() {
   ultimoSync = Date.now();
   guardar(syncKey, { at: ultimoSync });
-  sync.publicar({ at: ultimoSync, ajustes: real.ajustes, esperar: control.esperar });
+  sync.publicar({ at: ultimoSync, ajustes: real.ajustes, esperar: control.esperar, codigo: codigoEnPantalla });
+}
+
+function ponerCodigo(id, { compartirlo = true } = {}) {
+  codigoEnPantalla = codigoPorId(id)?.id || null;
+  guardar(codigoKey, { id: codigoEnPantalla });
+  mostrarCodigo();
+  if (compartirlo) {
+    compartir();
+    avisar(codigoEnPantalla ? `«${codigoPorId(codigoEnPantalla).titulo}» en todas las pantallas.` : 'Código QR quitado de las pantallas.');
+  }
+}
+
+// Dibuja el código en grande sobre la proyección y actualiza los botones de la sección de códigos.
+function mostrarCodigo() {
+  const codigo = codigoPorId(codigoEnPantalla);
+  const capa = $('#qr-pantalla');
+  capa.hidden = !codigo;
+  if (codigo) {
+    const imagen = capa.querySelector('img');
+    if (imagen.getAttribute('src') !== codigo.imagen) {
+      imagen.src = codigo.imagen;
+      imagen.width = codigo.ancho;
+      imagen.height = codigo.alto;
+    }
+    imagen.alt = `Código QR: ${codigo.titulo}`;
+  }
+  $('#proy-quitar-codigo').hidden = !codigo;
+  $('#codigos-activo').hidden = !codigo;
+  $('#codigos-activo-nombre').textContent = codigo?.titulo || '';
+  for (const boton of document.querySelectorAll('[data-codigo]')) {
+    const activo = boton.dataset.codigo === codigoEnPantalla;
+    boton.classList.toggle('principal', activo);
+    boton.textContent = activo ? '■ Quitar de pantallas' : '▶ Mostrar en pantallas';
+    boton.closest('.codigo')?.classList.toggle('activo', activo);
+  }
+}
+
+function renderCodigos() {
+  $('#codigos-lista').replaceChildren(...codigos.map(codigo => {
+    const tarjeta = element('article', 'codigo');
+    const imagen = element('img');
+    imagen.src = codigo.imagen;
+    imagen.width = codigo.ancho;
+    imagen.height = codigo.alto;
+    imagen.alt = `Código QR: ${codigo.titulo}`;
+    imagen.loading = 'lazy';
+    const boton = element('button', '', '▶ Mostrar en pantallas');
+    boton.type = 'button';
+    boton.dataset.codigo = codigo.id;
+    tarjeta.append(imagen, element('h3', '', codigo.titulo), element('p', '', codigo.detalle), boton);
+    return tarjeta;
+  }));
+  mostrarCodigo();
 }
 function recibirEstado(estado) {
   if (!Number.isFinite(estado.at) || estado.at <= ultimoSync) return;
@@ -563,6 +627,7 @@ function recibirEstado(estado) {
     guardar(controlKey, control);
     aplicarControl();
   }
+  if ((estado.codigo ?? null) !== codigoEnPantalla) ponerCodigo(estado.codigo ?? null, { compartirlo: false });
   tick();
 }
 function mostrarConexion(enLinea) {
@@ -962,6 +1027,17 @@ $('#ge-saltar').addEventListener('click', () => {
   if (ensayo) irAPaso(ensayo.paso + 1);
 });
 $('#ge-salir').addEventListener('click', requestClose);
+
+$('#codigos-lista').addEventListener('click', event => {
+  const boton = event.target.closest('[data-codigo]');
+  if (boton) ponerCodigo(boton.dataset.codigo === codigoEnPantalla ? null : boton.dataset.codigo);
+});
+$('#codigos-quitar').addEventListener('click', () => ponerCodigo(null));
+$('#proy-quitar-codigo').addEventListener('click', () => ponerCodigo(null));
+window.addEventListener('storage', event => {
+  if (event.key === codigoKey) { codigoEnPantalla = codigoPorId(leer(codigoKey).id)?.id || null; mostrarCodigo(); }
+});
+renderCodigos();
 
 iniciarFestejos($('#festejo-anuncio'));
 aplicarControl();
