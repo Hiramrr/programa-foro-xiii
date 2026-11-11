@@ -86,7 +86,7 @@ dialog::backdrop { background: rgb(29 45 65 / 45%); }
 #proyeccion { position: fixed; inset: 0; z-index: 10; background: #fff; display: grid; place-items: center; overflow: auto; padding: 32px; }
 #proyeccion:fullscreen { width: 100%; height: 100%; }
 .proyeccion-controles { position: fixed; z-index: 2; top: 16px; right: 16px; display: flex; flex-wrap: wrap; justify-content: end; gap: 10px; opacity: 0; }
-#proyeccion.controles-visibles .proyeccion-controles, .proyeccion-controles:hover, .proyeccion-controles:focus-within { opacity: 1; }
+#proyeccion.controles-visibles .proyeccion-controles, .proyeccion-controles:hover, .proyeccion-controles:has(:focus-visible) { opacity: 1; }
 #proyeccion-contenido { width: 100%; }
 .contador-proyectado { max-width: 1120px; margin: 0 auto; padding: 48px 32px; }
 .contador-proyectado h2 { font-size: clamp(24px, 3vw, 42px); line-height: 1.3; }
@@ -152,7 +152,6 @@ body.proyectando .festejo:not(.grande) .festejo-detalle { font-size: 18px; }
 @media (prefers-reduced-motion: reduce) {
   .festejo, .festejo.grande, .festejo-cursor, .contador-actividad[data-final="true"] .cuenta-rotulo { animation: none; }
 }
-@media (hover: none) { .proyeccion-controles { opacity: 1; } }
 @media (max-width: 800px) {
   .actividad-cuerpo { grid-template-columns: 1fr; gap: 28px; }
   .contador-actividad { width: min(100%, 430px); }
@@ -227,7 +226,6 @@ button:disabled { cursor: not-allowed; color: var(--tenue); border-color: #d3dde
 .cuenta[data-dias="false"] > :nth-child(-n+2) { display: none; }
 .contador-actividad[data-nivel="aviso"] .numero, .contador-actividad[data-nivel="aviso"] .cuenta-rotulo { color: var(--aviso); }
 .contador-actividad[data-nivel="alerta"] .numero, .contador-actividad[data-nivel="alerta"] .cuenta-rotulo { color: var(--alerta); }
-.contador-actividad[data-nivel="alerta"] .cuenta-rotulo { animation: parpadeo 1s steps(1) infinite; }
 .progreso { height: 8px; margin-top: 20px; border: 1px solid var(--borde); }
 .progreso span { display: block; height: 100%; background: var(--azul); }
 [data-nivel="aviso"] > .progreso span { background: var(--aviso); }
@@ -237,10 +235,8 @@ button:disabled { cursor: not-allowed; color: var(--tenue); border-color: #d3dde
 .proyeccion-controles { max-width: calc(100% - 32px); }
 #etiqueta-prueba { top: auto; bottom: 16px; }
 .proyeccion-tiempo { display: flex; flex-wrap: wrap; justify-content: end; gap: 10px; }
-.atajos { flex-basis: 100%; padding: 4px 8px; text-align: right; color: var(--tenue); background: #fff; font-size: 14px; }
 .aviso-proyeccion { position: fixed; z-index: 3; left: 50%; bottom: 24px; max-width: calc(100% - 32px); padding: 10px 16px; border: 1px solid var(--borde); color: var(--verde); background: #fff; transform: translateX(-50%); }
 .aviso-proyeccion:empty { padding: 0; border: 0; }
-@media (prefers-reduced-motion: reduce) { .contador-actividad[data-nivel="alerta"] .cuenta-rotulo { animation: none; } }
 @media (max-width: 800px) { .en-vivo-cuerpo { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .en-vivo { padding: 26px 14px 18px; } }
 
@@ -278,13 +274,24 @@ button.menos:hover:not(:disabled) { background: #fbf1e2; }
 .en-vivo-desfase { font-size: 17px; }
 @media (max-width: 900px) { .modos, .ajustes-tiempo { grid-template-columns: 1fr; } }
 
-/* Controles en la proyección: barra grande abajo, se oculta sola para no tapar al público. */
-.proyeccion-controles { top: auto; bottom: 16px; right: 16px; left: 16px; max-width: none; justify-content: center; padding: 12px; background: rgb(255 255 255 / 96%); border: 2px solid var(--borde); transition: opacity .2s; }
-.proyeccion-controles button { min-height: 56px; font-size: 18px; }
-.proyeccion-controles .salir { color: var(--alerta); border-color: #e0a29c; }
-.atajos { text-align: center; background: none; }
-.aviso-proyeccion { bottom: auto; top: 24px; font-size: 18px; }
+/* Controles en la proyección: pequeños y translúcidos para no distraer en las pantallas.
+   Aparecen al mover el ratón y se ocultan solos; el cursor también se oculta. */
+#proyeccion:not(.controles-visibles) { cursor: none; }
+.proyeccion-controles { top: auto; left: auto; right: 12px; bottom: 12px; max-width: calc(100% - 24px); display: grid; justify-items: end; gap: 6px; padding: 6px; background: rgb(255 255 255 / 82%); border: 1px solid #dbe3ee; transition: opacity .25s; }
+.proy-fila { display: flex; flex-wrap: wrap; justify-content: end; align-items: center; gap: 4px; }
+.proyeccion-controles button { min-height: 34px; padding: 4px 10px; border-width: 1px; font-size: 14px; font-weight: 500; }
+.proyeccion-controles .salir { color: var(--alerta); border-color: #e7b8b3; }
+.proy-libre { display: inline-flex; }
+.proy-libre .minutos-libres { width: 3.6em; min-height: 34px; padding: 2px 4px; border-width: 1px; font-size: 14px; }
+.proy-libre button { min-width: 34px; padding: 4px 8px; }
+.proy-libre button + button { border-left: 0; }
+.proy-unidad { color: var(--tenue); font-size: 13px; margin-right: 6px; }
+.aviso-proyeccion { top: auto; bottom: 12px; left: 12px; transform: none; padding: 4px 10px; font-size: 13px; color: var(--tenue); background: rgb(255 255 255 / 82%); border-color: #dbe3ee; }
 #etiqueta-prueba { bottom: auto; top: 16px; }
+
+/* Tiempo extra: la cuenta sigue y solo cambia de color, sin parpadeos. */
+.contador-actividad[data-nivel="alerta"] .numero, .contador-actividad[data-nivel="alerta"] .cuenta-rotulo { color: #c2410c; transition: color .6s; }
+[data-nivel="alerta"] > .progreso span { background: #c2410c; }
 
 /* Taza ASCII del receso. */
 .taza { display: inline-block; max-width: 100%; overflow: hidden; line-height: 0; }
@@ -299,3 +306,16 @@ button.menos:hover:not(:disabled) { background: #fbf1e2; }
 .tz-brillo { color: var(--acento); }
 .festejo-arte .taza pre { font-size: 1.6px; }
 @media (max-width: 520px), (max-height: 650px) { .receso-proyectado .taza pre { font-size: clamp(3px, .5vh, 5px); } }
+
+/* QR de registro junto al contador, antes de cada conferencia y en sus primeros minutos. */
+.qr-registro { display: none; margin: 0; padding: 18px; background: #fff; border: 1px solid var(--borde); }
+.qr-registro img { display: block; height: min(72vh, 820px); width: auto; max-width: 100%; }
+.contador-proyectado[data-qr="true"] { max-width: 1600px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: center; }
+.contador-proyectado[data-qr="true"] .qr-registro { display: block; }
+.contador-proyectado[data-qr="true"] .numero { font-size: clamp(32px, 6vw, 96px); }
+.contador-proyectado[data-qr="true"] .separador { font-size: clamp(24px, 4vw, 64px); }
+@media (max-width: 900px), (orientation: portrait) {
+  .contador-proyectado[data-qr="true"] { grid-template-columns: 1fr; justify-items: center; }
+  .qr-registro img { height: min(40vh, 520px); }
+}
+.proy-nota { margin: 0; color: var(--tenue); font-size: 12px; text-align: right; }
