@@ -1,15 +1,19 @@
 import { simulado } from './reloj.js?v=9';
 import { programa } from './programa.js?v=2';
-import { estadoActividad, estadoAutomatico, calcularHorario, desglose } from './contador.mjs?v=12';
+import { estadoActividad, estadoAutomatico, calcularHorario, desglose } from './contador.mjs?v=13';
 import { hitosEntre } from './hitos.mjs?v=8';
 import { artes, festejar, iniciarFestejos } from './festejos.js?v=10';
 import { transicion } from './transicion.js?v=8';
 import { tazaAnimada } from './receso.js?v=11';
+import { crearSync } from './sync.js?v=1';
 
 const $ = selector => document.querySelector(selector);
 // Con reloj simulado (pruebas.html) los ajustes de horario se guardan aparte para no tocar los reales.
 const horarioKey = simulado ? 'xiii-foro-horario-prueba' : 'xiii-foro-horario-v1';
 const controlKey = 'xiii-foro-control-v1';
+// Canal de ntfy.sh por el que se comparten los ajustes con todas las pantallas. Con reloj simulado se usa otro.
+const canal = 'xiii-foro-dcc-2026-b86c97c36ea85009' + (simulado ? '-prueba' : '');
+const syncKey = simulado ? 'xiii-foro-sync-prueba' : 'xiii-foro-sync-v1';
 const minuto = 60000;
 // El QR de registro se muestra antes de cada conferencia y durante sus primeros minutos.
 const qrMinutos = 5;
@@ -22,7 +26,8 @@ const records = new Map();
 for (const [day, data] of Object.entries(programa)) {
   for (const activity of data.activities) {
     const key = `${day}-${activity.start}`;
-    records.set(key, { ...activity, key, day,
+    // La primera actividad de cada día arranca solo cuando el operador la inicia.
+    records.set(key, { ...activity, key, day, manual: activity === data.activities[0],
       // En pantalla se muestra la institución; el agradecimiento lleva solo el nombre.
       speaker: [activity.speaker, activity.institucion].filter(Boolean).join(' · '),
       recipient: /^(Estudiantes|Participantes|Moderan)/.test(activity.speaker || '') ? '' : activity.speaker || '',
@@ -42,9 +47,9 @@ function guardar(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
 }
 
-function leerAjustes() {
+function leerAjustes(origen = leer(horarioKey)) {
   const valid = {};
-  for (const [key, value] of Object.entries(leer(horarioKey))) {
+  for (const [key, value] of Object.entries(origen && typeof origen === 'object' ? origen : {})) {
     if (!records.has(key) || !value || typeof value !== 'object') continue;
     const ajuste = {};
     for (const campo of ['inicio', 'fin', 'extra']) if (Number.isFinite(value[campo])) ajuste[campo] = value[campo];
@@ -101,7 +106,7 @@ function horario(timeline, now) {
   const esperar = control.esperar;
   const lista = [...dias.values()].flatMap(actividades => calcularHorario(actividades, timeline.ajustes, now, { esperar }));
   if (!esperar) return lista;
-  const iniciadas = lista.filter(r => r.kind !== 'break' && !r.omitida && !r.enEspera && r.startMs <= now && now < r.endMs && timeline.ajustes[r.key]?.inicio == null);
+  const iniciadas = lista.filter(r => r.kind !== 'break' && !r.omitida && !r.enEspera && !r.porIniciar && r.startMs <= now && now < r.endMs && timeline.ajustes[r.key]?.inicio == null);
   if (!iniciadas.length) return lista;
   for (const r of iniciadas) timeline.ajustes[r.key] = { ...timeline.ajustes[r.key], inicio: r.startMs };
   if (timeline.persistente) guardar(horarioKey, timeline.ajustes);
@@ -111,6 +116,7 @@ function horario(timeline, now) {
 function estadoDe(record, now) {
   if (record.omitida) return 'omitida';
   if (record.tiempoExtra) return 'extra';
+  if (record.porIniciar) return 'porIniciar';
   if (record.enEspera && record.startMs <= now) return 'espera';
   return estadoActividad(record.startMs, record.endMs, now).tipo;
 }
@@ -119,10 +125,10 @@ const enCurso = (record, now) => ['durante', 'extra'].includes(estadoDe(record, 
 
 function objetivo(lista, now) {
   const activas = lista.filter(r => !r.omitida);
-  return activas.find(r => enCurso(r, now)) || activas.find(r => ['antes', 'espera'].includes(estadoDe(r, now)));
+  return activas.find(r => enCurso(r, now)) || activas.find(r => ['antes', 'espera', 'porIniciar'].includes(estadoDe(r, now)));
 }
 
-// Fuera del día del evento los ajustes del horario real se bloquean; la prueba rápida siempre se puede ajustar.
+// Fuera del día del evento los ajustes del horario real se bloquean; el ensayo siempre se puede ajustar.
 function editable(timeline, record, now) {
   return !timeline.persistente || programa[record.day]?.date === hoy(now);
 }
@@ -157,9 +163,9 @@ function createClock(record, progreso = false) {
   return clock;
 }
 
-const rotulos = { antes: '[ inicia en ]', durante: '[ termina en ]', extra: '[ tiempo extra ]', espera: '[ en espera ]', despues: '[ finalizada ]', omitida: '[ omitida ]' };
-const mensajes = { espera: 'Al terminar la anterior', despues: 'Finalizada', omitida: 'Omitida' };
-const lecturas = { antes: 'Inicia en', durante: 'Termina en', extra: 'Tiempo extra de', espera: 'Inicia al terminar la actividad anterior', despues: 'Actividad finalizada', omitida: 'Actividad omitida' };
+const rotulos = { antes: '[ inicia en ]', durante: '[ termina en ]', extra: '[ tiempo extra ]', espera: '[ en espera ]', porIniciar: '[ por comenzar ]', despues: '[ finalizada ]', omitida: '[ omitida ]' };
+const mensajes = { espera: 'Al terminar la anterior', porIniciar: 'Empezando…', despues: 'Finalizada', omitida: 'Omitida' };
+const lecturas = { antes: 'Inicia en', durante: 'Termina en', extra: 'Tiempo extra de', espera: 'Inicia al terminar la actividad anterior', porIniciar: 'Empezando en unos momentos', despues: 'Actividad finalizada', omitida: 'Actividad omitida' };
 
 function updateClock(clock, now) {
   const record = clock.record;
@@ -226,7 +232,7 @@ function setControlesTiempo(grupo, record, now, timeline, { permitido = true } =
   });
   const [avanzar] = botones('avanzar');
   avanzar.textContent = curso ? '■ Terminar ahora' : '▶ Iniciar ahora';
-  avanzar.disabled = !permitido || !(curso || estado === 'antes' || estado === 'espera');
+  avanzar.disabled = !permitido || !(curso || ['antes', 'espera', 'porIniciar'].includes(estado));
   const [reiniciar] = botones('reiniciar');
   reiniciar.hidden = !curso;
   reiniciar.disabled = !permitido;
@@ -256,7 +262,7 @@ function updateEnVivo(lista, now) {
   panelClock.record = record;
   updateClock(panelClock, now);
   const estado = estadoDe(record, now);
-  $('#en-vivo-estado').textContent = `${{ durante: '● En curso', extra: '● Tiempo cumplido', antes: 'Siguiente', espera: 'Siguiente' }[estado]} · ${hora(record.startMs)} a ${record.tiempoExtra ? 'ya' : hora(record.endMs)}`;
+  $('#en-vivo-estado').textContent = `${{ durante: '● En curso', extra: '● Tiempo cumplido', antes: 'Siguiente', espera: 'Siguiente', porIniciar: '◌ Esperando a que la inicies' }[estado]} · ${hora(record.startMs)} a ${record.tiempoExtra ? 'ya' : hora(record.endMs)}`;
   $('#en-vivo-titulo').textContent = record.title;
   $('#en-vivo-ponente').textContent = record.speaker || '';
   $('#en-vivo-ponente').hidden = !record.speaker;
@@ -276,13 +282,13 @@ function updateVista(now) {
   if (record) setControlesTiempo(grupo, record, now, vista.timeline, { permitido });
   $('#proy-auto').setAttribute('aria-pressed', String(Boolean(automatic)));
   $('#proy-auto').textContent = automatic ? '⟳ Automático: sí' : '⟳ Automático: no';
-  for (const id of ['#proy-auto', '#proy-anterior', '#proy-siguiente']) $(id).hidden = Boolean(automatic?.demo) || !vista;
+  for (const id of ['#proy-auto', '#proy-anterior', '#proy-siguiente']) $(id).hidden = !vista;
   if (!record || !vista.clock) return;
   vista.clock.record = record;
   updateClock(vista.clock, now);
   if (vista.panel && vista.mode === 'contador') {
     const estado = estadoDe(record, now);
-    const conQr = record.kind !== 'break' && (['antes', 'espera'].includes(estado) || (estado === 'durante' && now - record.startMs < qrMinutos * minuto));
+    const conQr = record.kind !== 'break' && (['antes', 'espera', 'porIniciar'].includes(estado) || (estado === 'durante' && now - record.startMs < qrMinutos * minuto));
     vista.panel.dataset.qr = String(conQr);
   }
   const proxima = lista.slice(lista.indexOf(record) + 1).find(r => r.day === record.day && r.kind !== 'break' && !r.omitida);
@@ -313,7 +319,7 @@ function abrirReceso(hito) {
 // Las actividades omitidas no se festejan; la que está en tiempo extra todavía no termina
 // y las que esperan a que termine todavía no empiezan.
 function paraHitos(lista) {
-  return lista.filter(r => !r.omitida && !r.enEspera).map(r => r.tiempoExtra ? { ...r, endMs: Infinity } : r);
+  return lista.filter(r => !r.omitida && !r.enEspera && !r.porIniciar).map(r => r.tiempoExtra ? { ...r, endMs: Infinity } : r);
 }
 
 function tick() {
@@ -328,8 +334,7 @@ function tick() {
   // Tras una pausa larga (pestaña oculta o equipo suspendido) no se festejan hitos atrasados.
   if (now - lastTick <= 5000) {
     const base = automatic?.demo ? horario(automatic.timeline, now) : lista;
-    const limite = automatic?.demo ? finPrueba(base) : Infinity;
-    const hitos = hitosEntre(paraHitos(base), lastTick, now).filter(hito => hito.at < limite);
+    const hitos = hitosEntre(paraHitos(base), lastTick, now);
     const celebrar = () => hitos.forEach(hito => hito.tipo === 'receso' ? abrirReceso(hito) : festejar(festejoPara(hito)));
     // En el inicio y el fin del foro o de un día, los festejos esperan a que se retiren los bloques.
     const rotulo = hitos.map(rotuloHito).filter(Boolean).at(-1);
@@ -337,6 +342,7 @@ function tick() {
     else celebrar();
   }
   lastTick = now;
+  actualizarEnsayo();
 }
 
 function rotuloHito(hito) {
@@ -349,6 +355,11 @@ function rotuloHito(hito) {
   }
 }
 
+function tituloReceso(record) {
+  const minutos = Math.max(1, Math.round((record.endMs - record.startMs) / minuto));
+  return `Receso de ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`;
+}
+
 function festejoPara(hito) {
   const record = hito.record;
   const name = record.recipient;
@@ -358,7 +369,7 @@ function festejoPara(hito) {
     case 'inicio-foro': return { grande: true, pista: !automatic?.demo, rotulo: '[ xiii foro ]', titulo: '¡Comienza el XIII Foro!', detalle: record.title, arte: artes.fuegos, progreso };
     case 'inicio-dia': return { grande: true, rotulo: `[ día ${hito.dia} ]`, titulo: `¡Arranca el día ${hito.dia} del foro!`, detalle: [record.title, record.speaker].filter(Boolean).join(' · '), arte: artes.fuegos, progreso };
     case 'inicio': return { rotulo: '[ comienza ]', titulo: record.title, detalle: record.speaker, arte: artes.carga, progreso };
-    case 'receso': return { rotulo: '[ receso ]', titulo: `Receso de ${Math.round((record.endMs - record.startMs) / 60000)} minutos`, detalle: 'Estira las piernas, toma agua y regresa a tiempo.', arte: artes.cafe };
+    case 'receso': return { rotulo: '[ receso ]', titulo: tituloReceso(record), detalle: 'Estira las piernas, toma agua y regresa a tiempo.', arte: artes.cafe };
     case 'fin': return { rotulo: '[ aplausos ]', titulo: name ? `¡Gracias, ${name}!` : '¡Gracias a todos!', detalle: record.title, arte: artes.aplausos, progreso };
     case 'sesion': return { rotulo: '[ sesión completada ]', titulo: `¡${sessionName} completada!`, detalle: `${sessionTopic} · ${hito.ponencias} ponencias`, arte: artes.sesion(hito.ponencias), progreso };
     case 'mitad': return { rotulo: '[ mitad del foro ]', titulo: '¡Ya llevamos la mitad del foro!', detalle: `${hito.completadas} de ${hito.total} actividades completadas`, arte: artes.estrellas, progreso, lluvia: true };
@@ -368,23 +379,16 @@ function festejoPara(hito) {
   }
 }
 
-// La prueba termina seis segundos después de que arranca la segunda conferencia.
-function finPrueba(lista) {
-  const ultima = lista.at(-1);
-  return ultima.enEspera ? Infinity : ultima.startMs + 6000;
-}
-
 function advanceAutomatic(now) {
   const { timeline } = automatic;
   const lista = horario(timeline, now);
-  const state = automatic.demo && now >= finPrueba(lista) ? { mode: 'fin' }
-    : estadoAutomatico(lista.filter(r => !r.omitida), now);
+  const state = estadoAutomatico(lista.filter(r => !r.omitida), now);
   const key = `${state.mode}:${state.record?.key || ''}`;
   if (automatic.last === key) return;
-  const rotulo = !automatic.last ? (automatic.demo ? '[ prueba rápida ]' : '[ modo automático ]')
+  const rotulo = !automatic.last ? (automatic.demo ? '[ ensayo ]' : '[ modo automático ]')
     : state.mode === 'receso' ? '[ receso ]'
     : state.mode === 'contador' ? '[ siguiente actividad ]'
-    : automatic.demo ? '[ prueba terminada ]' : '[ programa concluido ]';
+    : automatic.demo ? '[ ensayo terminado ]' : '[ programa concluido ]';
   automatic.last = key;
   const run = automatic;
   transicion(() => {
@@ -400,10 +404,10 @@ function showAutomaticEnd() {
   vista = null;
   $('#proyeccion').dataset.mode = 'fin';
   const panel = element('div', 'fin-automatico panel');
-  panel.append(element('h2', '', automatic.demo ? 'Prueba terminada' : 'Programa concluido'));
+  panel.append(element('h2', '', automatic.demo ? 'Ensayo terminado' : 'Programa concluido'));
   const actions = element('div', 'acciones-dialog');
   if (automatic.demo) {
-    const repeat = element('button', '', 'Repetir prueba');
+    const repeat = element('button', '', 'Repetir ensayo');
     repeat.type = 'button';
     repeat.addEventListener('click', () => startAutomatic(true));
     actions.append(repeat);
@@ -419,24 +423,26 @@ function showAutomaticEnd() {
   document.body.classList.add('proyectando');
   updateVista(Date.now());
   revealControls();
-  if (automatic.demo) festejar({ rotulo: '[ prueba rápida ]', titulo: '¡Todo listo para el foro!', detalle: 'Inicio, conferencia, aplausos y siguiente conferencia comprobados.', arte: artes.aplausos, lluvia: true });
+  if (automatic.demo) festejar({ rotulo: '[ ensayo ]', titulo: '¡Todo listo para el foro!', detalle: 'Ya practicaste iniciar, ajustar el tiempo, el tiempo extra, terminar y el receso.', arte: artes.aplausos, lluvia: true });
 }
 
-function crearPrueba(now) {
-  // Cada animación termina antes del siguiente hito: inicio del foro (8 s), aplausos (5 s)
-  // e inicio de la siguiente conferencia (5 s).
-  // Los ajustes de la prueba viven solo en memoria y no tocan el horario real.
-  const [first, second] = [...records.values()].filter(r => r.kind !== 'break' && r.recipient).slice(0, 2);
-  return {
-    lista: [{ ...first, startMs: now + 4000, endMs: now + 16000 }, { ...second, startMs: now + 24000, endMs: now + 40000 }],
-    ajustes: {}, historial: [], persistente: false
-  };
+// Agenda corta del ensayo guiado: inauguración (espera a que la inicien), conferencia, receso y otra conferencia.
+// Vive solo en memoria: no toca el horario real ni se comparte con las demás pantallas.
+const claveEnsayo = { inaug: 'jueves-09:10', conf: 'jueves-09:40', receso: 'jueves-11:40', sig: 'jueves-10:40' };
+function crearEnsayo(now) {
+  // Todas comparten la misma hora de inicio: cada una empieza en cuanto termina la anterior.
+  const t = now + 12000;
+  const lista = [['inaug', 180], ['conf', 90], ['receso', 20], ['sig', 90]].map(([nombre, segundos]) =>
+    ({ ...records.get(claveEnsayo[nombre]), startMs: t, endMs: t + segundos * 1000 }));
+  return { lista, ajustes: {}, historial: [], persistente: false };
 }
 
 function startAutomatic(demo = false) {
   const now = Date.now();
-  automatic = { timeline: demo ? crearPrueba(now) : real, demo, last: '' };
+  automatic = { timeline: demo ? crearEnsayo(now) : real, demo, last: '' };
   $('#etiqueta-prueba').hidden = !demo;
+  if (demo) iniciarEnsayo();
+  else terminarEnsayo();
   advanceAutomatic(now);
 }
 
@@ -503,18 +509,52 @@ function cambiar(timeline, mensaje, cambio) {
   const persisted = !timeline.persistente || guardar(horarioKey, timeline.ajustes);
   avisar(persisted ? mensaje : `${mensaje} El navegador no permitió guardar el ajuste para otra visita.`);
   tick();
+  if (timeline.persistente) compartir();
 }
 
 const ajuste = (ajustes, key) => (ajustes[key] ||= {});
 
 function deshacer(timeline) {
   const previo = timeline.historial.pop();
-  if (!previo) return;
+  if (!previo) return avisar('No hay nada que deshacer.');
+  registrarEnsayo(timeline, 'deshacer');
   timeline.ajustes = JSON.parse(previo);
   if (timeline.persistente) guardar(horarioKey, timeline.ajustes);
   avisar('Se deshizo el último ajuste.');
   tick();
+  if (timeline.persistente) compartir();
 }
+
+// Sincronización entre pantallas: se aplica el estado más reciente, venga de aquí o de otra pantalla.
+let ultimoSync = Number(leer(syncKey).at) || 0;
+function compartir() {
+  ultimoSync = Date.now();
+  guardar(syncKey, { at: ultimoSync });
+  sync.publicar({ at: ultimoSync, ajustes: real.ajustes, esperar: control.esperar });
+}
+function recibirEstado(estado) {
+  if (!Number.isFinite(estado.at) || estado.at <= ultimoSync) return;
+  ultimoSync = estado.at;
+  guardar(syncKey, { at: ultimoSync });
+  real.ajustes = leerAjustes(estado.ajustes);
+  real.historial = [];
+  guardar(horarioKey, real.ajustes);
+  if (typeof estado.esperar === 'boolean' && estado.esperar !== control.esperar) {
+    control.esperar = estado.esperar;
+    guardar(controlKey, control);
+    aplicarControl();
+  }
+  tick();
+}
+function mostrarConexion(enLinea) {
+  for (const nodo of document.querySelectorAll('[data-sync]')) {
+    nodo.dataset.enLinea = String(enLinea);
+    nodo.textContent = enLinea
+      ? (nodo.dataset.sync === 'corto' ? '● En línea' : '● En línea: los cambios se ven al instante en todas las pantallas.')
+      : (nodo.dataset.sync === 'corto' ? '○ Sin conexión' : '○ Sin conexión: los cambios solo se ven aquí. Reintentando…');
+  }
+}
+const sync = crearSync({ canal, alRecibir: recibirEstado, alEstado: mostrarConexion });
 
 function ejecutar(accion, origen, valor) {
   const now = Date.now();
@@ -529,6 +569,7 @@ function ejecutar(accion, origen, valor) {
   const curso = estado === 'durante' || estado === 'extra';
   if (accion === 'ajustar' && (curso || estado === 'antes')) {
     if (!valor) return;
+    registrarEnsayo(timeline, valor > 0 ? 'mas' : 'menos');
     const texto = `${valor > 0 ? '+' : '−'}${Math.abs(valor) / minuto} min`;
     // En curso cambia la duración; antes de empezar mueve el inicio.
     if (curso) cambiar(timeline, `${texto} a «${record.title}».`, ajustes => {
@@ -541,7 +582,7 @@ function ejecutar(accion, origen, valor) {
     cambiar(timeline, `«${record.title}» terminó.`, ajustes => { ajuste(ajustes, record.key).fin = now; });
     // Sin modo automático, la pantalla pasa sola a lo que sigue.
     if (enProyeccion && !automatic) navegar(1);
-  } else if (accion === 'avanzar' && (estado === 'antes' || estado === 'espera')) {
+  } else if (accion === 'avanzar' && ['antes', 'espera', 'porIniciar'].includes(estado)) {
     cambiar(timeline, `«${record.title}» inició.`, ajustes => {
       for (const r of lista) {
         if (r.day !== record.day || r.key === record.key) continue;
@@ -569,6 +610,7 @@ function alternarOmitida(key) {
 
 function clearProjection() {
   automatic = null;
+  terminarEnsayo();
   $('#etiqueta-prueba').hidden = true;
   clearTimeout(controlsTimeout);
   $('#proyeccion-contenido').replaceChildren();
@@ -641,7 +683,7 @@ async function showProjection(record, mode, timeline = real) {
     const taza = tazaAnimada();
     vista.detener = taza.detener;
     const panel = element('div', 'contador-proyectado receso-proyectado panel');
-    panel.append(element('span', 'rotulo', '[ receso ]'), taza.nodo, element('h2', '', `Receso de ${Math.round((record.endMs - record.startMs) / minuto)} minutos`));
+    panel.append(element('span', 'rotulo', '[ receso ]'), taza.nodo, element('h2', '', tituloReceso(record)));
     vista.clock = createClock(record, true);
     vista.siguiente = element('p', 'a-continuacion');
     panel.append(vista.clock.root, vista.siguiente, element('p', 'receso-mensaje', 'Estira las piernas, toma agua y regresa a tiempo.'));
@@ -693,6 +735,7 @@ document.addEventListener('click', event => {
     const campo = button.closest('[role="group"]').querySelector('.minutos-libres');
     const minutos = Math.round(Number(campo.value));
     if (!(minutos >= 1 && minutos <= 180)) { campo.focus(); return avisar('Escribe cuántos minutos (de 1 a 180).'); }
+    if (origen === 'proyeccion' && vista) registrarEnsayo(vista.timeline, 'libre');
     return ejecutar('ajustar', origen, Number(button.dataset.signo) * minutos * minuto);
   }
   ejecutar(button.dataset.control, origen, Number(button.dataset.valor));
@@ -710,7 +753,7 @@ $('#control-tiempos').addEventListener('click', () => {
   renderAgenda();
   avisar(control.activo ? 'Control de tiempos activado.' : 'Control de tiempos desactivado.');
 });
-$('#pref-esperar').addEventListener('change', event => { control.esperar = event.target.value === 'esperar'; guardar(controlKey, control); tick(); });
+$('#pref-esperar').addEventListener('change', event => { control.esperar = event.target.value === 'esperar'; guardar(controlKey, control); tick(); compartir(); });
 $('#restablecer').addEventListener('click', () => {
   if (!Object.keys(real.ajustes).length) return avisar('El horario ya coincide con el programa.');
   if (!confirm('¿Volver al horario original? Se quitan todos los ajustes (puedes deshacerlo).')) return;
@@ -718,7 +761,8 @@ $('#restablecer').addEventListener('click', () => {
 });
 // Cambia la actividad en pantalla sin salir de la proyección. Moverse a mano detiene el modo automático.
 function navegar(paso) {
-  if (!vista || automatic?.demo) return;
+  if (automatic?.demo) return avisar('En el ensayo este botón solo se muestra. En el evento cambia la actividad en pantalla.');
+  if (!vista) return;
   const lista = horario(real, Date.now()).filter(r => !r.omitida);
   const indice = lista.findIndex(r => r.key === vista.key);
   const destino = lista[indice + paso];
@@ -730,6 +774,7 @@ function navegar(paso) {
 $('#proy-anterior').addEventListener('click', () => navegar(-1));
 $('#proy-siguiente').addEventListener('click', () => navegar(1));
 $('#proy-auto').addEventListener('click', () => {
+  if (automatic?.demo) return avisar('En el ensayo el automático siempre está activo. En el evento este botón lo pausa o lo reanuda.');
   if (automatic) { automatic = null; avisar('Automático en pausa: la pantalla se queda aquí.'); updateVista(Date.now()); }
   else startAutomatic();
 });
@@ -778,6 +823,120 @@ function programarTick() {
     try { tick(); } finally { programarTick(); }
   }, 1000 - Date.now() % 1000 + 5);
 }
+
+// ——— Ensayo guiado ———
+// Una tarjeta explica cada situación, resalta el botón que hay que pulsar y avanza sola cuando se hace.
+let ensayo = null;
+const avanzarBoton = '#proyeccion-tiempo [data-control="avanzar"]';
+function registroEnsayo(nombre) {
+  if (!automatic?.demo) return null;
+  const now = Date.now();
+  return horario(automatic.timeline, now).find(r => r.key === claveEnsayo[nombre]);
+}
+const estadoEnsayo = nombre => { const r = registroEnsayo(nombre); return r ? estadoDe(r, Date.now()) : ''; };
+function registrarEnsayo(timeline, accion) {
+  if (!ensayo || timeline !== automatic?.timeline) return;
+  ensayo.acciones.push(accion);
+  setTimeout(actualizarEnsayo, 50);
+}
+// Adelanta el reloj de la actividad para que su tiempo se acabe en seis segundos.
+function acelerarEnsayo(nombre) {
+  const r = registroEnsayo(nombre);
+  if (!r || estadoDe(r, Date.now()) !== 'durante') return;
+  const original = automatic.timeline.lista.find(x => x.key === r.key);
+  automatic.timeline.ajustes[r.key] = { inicio: Date.now() + 6000 - (original.endMs - original.startMs) };
+  tick();
+}
+const pasosEnsayo = [
+  { titulo: 'Bienvenida al ensayo', boton: 'Empezar',
+    texto: 'Esto es lo que verá el público en las pantallas. Vamos a practicar con una agenda de prueba de pocos minutos. Nada de lo que hagas aquí cambia el horario real ni las demás pantallas.\n\nLos controles están abajo a la derecha (los marcados en verde). En el evento se esconden solos y aparecen al mover el ratón; en el ensayo se quedan fijos.',
+    objetivo: '.proyeccion-controles' },
+  { titulo: 'Cuenta regresiva',
+    texto: 'Antes de cada conferencia se ve cuánto falta para empezar y el QR de registro.\n\nNo tienes que hacer nada: espera unos segundos a que llegue la hora.',
+    listo: () => ['porIniciar', 'durante', 'extra'].includes(estadoEnsayo('inaug')) },
+  { titulo: 'La inauguración espera por ti',
+    texto: 'Llegó la hora, pero la inauguración no arranca sola: en pantalla dice «Empezando…».\n\nCuando de verdad comience, pulsa ▶ Iniciar ahora (también sirve la flecha → del teclado o del presentador).',
+    objetivo: avanzarBoton, listo: () => ['durante', 'extra'].includes(estadoEnsayo('inaug')) },
+  { titulo: '¡Arrancó! Dar más tiempo',
+    texto: 'La cuenta ahora muestra cuánto falta para terminar, y el mismo botón cambió a ■ Terminar ahora.\n\nSi te avisan que el ponente necesita más tiempo, pulsa +1 o +5. Pruébalo ahora.',
+    objetivo: '#proyeccion-tiempo [data-valor="60000"], #proyeccion-tiempo [data-valor="300000"]', accion: 'mas' },
+  { titulo: 'Quitar tiempo',
+    texto: 'Si hay que recortar, pulsa −1 o −5. Pruébalo.',
+    objetivo: '#proyeccion-tiempo [data-valor="-60000"], #proyeccion-tiempo [data-valor="-300000"]', accion: 'menos' },
+  { titulo: 'Otra cantidad de minutos',
+    texto: 'Para otra cantidad, escribe los minutos en la casilla y pulsa + para sumarlos o − para quitarlos. Pruébalo.',
+    objetivo: '#proyeccion-tiempo .proy-libre', accion: 'libre' },
+  { titulo: 'Si te equivocas',
+    texto: 'Pulsa ↶ Deshacer (o la flecha ←) y se revierte lo último que hiciste. Pruébalo.',
+    objetivo: '#proyeccion-tiempo [data-control="deshacer"]', accion: 'deshacer' },
+  { titulo: 'Se acabó el tiempo',
+    texto: 'Ahora adelantamos el reloj para que el tiempo se acabe en unos segundos. Mira la cuenta: al llegar a cero no se corta, sigue contando en naranja como tiempo extra. El público solo nota el cambio de color.\n\nEspera unos segundos.',
+    alEntrar: () => acelerarEnsayo('inaug'), listo: () => ['extra', 'despues'].includes(estadoEnsayo('inaug')) },
+  { titulo: 'Terminar cuando acabe de verdad',
+    texto: 'Lo que sigue espera hasta que tú digas. Cuando el ponente termine, pulsa ■ Terminar ahora (o →).',
+    objetivo: avanzarBoton, listo: () => estadoEnsayo('inaug') === 'despues' },
+  { titulo: 'Sigue la siguiente', boton: 'Entendido',
+    texto: 'La pantalla pasó sola a la siguiente conferencia, que empezó en ese momento con su tiempo completo. Así los retrasos se recorren solos a todo el día.\n\nEl QR de registro se queda los primeros 5 minutos de cada conferencia.' },
+  { titulo: 'Otros botones', boton: 'Entendido',
+    texto: '◀ Anterior y Siguiente ▶ cambian lo que se muestra y pausan el automático; ⟳ Automático lo vuelve a activar.\n\n⟲ Reiniciar cuenta otra vez el tiempo completo desde ahora (por ejemplo, si el ponente tardó en conectarse).\n\nEn el ensayo estos botones solo te avisan.',
+    objetivo: '#proy-anterior, #proy-siguiente, #proy-auto, #proyeccion-tiempo [data-control="reiniciar"]' },
+  { titulo: 'Ir al receso',
+    texto: 'Termina esta conferencia con ■ Terminar ahora para ver el receso.',
+    objetivo: avanzarBoton, listo: () => ['durante', 'despues'].includes(estadoEnsayo('receso')) },
+  { titulo: 'Receso',
+    texto: 'En los recesos aparece la taza y la cuenta para regresar. El receso termina solo y la pantalla pasa sola a la siguiente conferencia.\n\nNo tienes que hacer nada: espera unos segundos.',
+    listo: () => ['durante', 'extra', 'despues'].includes(estadoEnsayo('sig')) },
+  { titulo: '¡Listo para el foro!', boton: 'Terminar ensayo', final: true,
+    texto: '• ▶ Iniciar ahora: arrancar, sobre todo la inauguración.\n• ■ Terminar ahora: cuando el ponente acabe.\n• +/−: dar o quitar minutos.\n• ↶ Deshacer: si te equivocas.\n• ✕ Salir: cerrar la proyección. Esc solo quita la pantalla completa (F la regresa).\n\nEl día del evento, todo lo que hagas se ve al instante en todas las pantallas.' }
+];
+function iniciarEnsayo() {
+  ensayo = { paso: -1, acciones: [], desde: 0 };
+  $('#proyeccion').classList.add('ensayando');
+  $('#guia-ensayo').hidden = false;
+  irAPaso(0);
+}
+function terminarEnsayo() {
+  ensayo = null;
+  $('#proyeccion').classList.remove('ensayando');
+  $('#guia-ensayo').hidden = true;
+  document.querySelectorAll('.resaltado').forEach(nodo => nodo.classList.remove('resaltado'));
+}
+function irAPaso(numero) {
+  const paso = pasosEnsayo[numero];
+  if (!ensayo || !paso) return;
+  ensayo.paso = numero;
+  ensayo.desde = ensayo.acciones.length;
+  $('#ge-paso').textContent = `Paso ${numero + 1} de ${pasosEnsayo.length}`;
+  $('#ge-progreso').style.width = `${(numero + 1) / pasosEnsayo.length * 100}%`;
+  $('#ge-titulo').textContent = paso.titulo;
+  $('#ge-texto').textContent = paso.texto;
+  $('#ge-siguiente').hidden = !paso.boton;
+  $('#ge-siguiente').textContent = paso.boton || '';
+  $('#ge-espera').hidden = Boolean(paso.boton);
+  $('#ge-espera').textContent = paso.accion || paso.objetivo ? '👉 Pulsa el botón marcado en verde.' : '⏳ Espera unos segundos…';
+  $('#ge-saltar').hidden = Boolean(paso.boton);
+  document.querySelectorAll('.resaltado').forEach(nodo => nodo.classList.remove('resaltado'));
+  if (paso.objetivo) document.querySelectorAll(paso.objetivo).forEach(nodo => nodo.classList.add('resaltado'));
+  paso.alEntrar?.();
+  actualizarEnsayo();
+}
+function actualizarEnsayo() {
+  if (!ensayo || !automatic?.demo) return;
+  const paso = pasosEnsayo[ensayo.paso];
+  if (!paso || paso.boton) return;
+  const hecho = paso.accion ? ensayo.acciones.slice(ensayo.desde).includes(paso.accion) : paso.listo?.();
+  if (hecho) irAPaso(ensayo.paso + 1);
+}
+$('#ge-siguiente').addEventListener('click', () => {
+  const paso = pasosEnsayo[ensayo?.paso];
+  if (paso?.final) requestClose();
+  else if (ensayo) irAPaso(ensayo.paso + 1);
+});
+$('#ge-saltar').addEventListener('click', () => {
+  // Saltar un paso que espera a que se acabe el tiempo adelanta también el reloj.
+  if (ensayo) irAPaso(ensayo.paso + 1);
+});
+$('#ge-salir').addEventListener('click', requestClose);
 
 iniciarFestejos($('#festejo-anuncio'));
 aplicarControl();
