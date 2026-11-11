@@ -344,3 +344,21 @@ button.menos:hover:not(:disabled) { background: #fbf1e2; }
 @keyframes resaltar { 50% { outline-color: transparent; box-shadow: 0 0 0 6px rgb(0 173 77 / 25%); } }
 @media (prefers-reduced-motion: reduce) { .resaltado { animation: none; } }
 @media (min-width: 1300px) { #proyeccion.ensayando #proyeccion-contenido { padding-left: 440px; } }
+
+/* Sección de códigos QR en la página principal. */
+.codigos { margin-top: 26px; padding: 26px 18px 18px; }
+.codigos > .rotulo { color: var(--verde); }
+.codigos-ayuda { color: var(--tenue); font-size: 15px; }
+.codigos-activo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 10px 14px; border: 2px solid var(--verde); background: #e9f6ee; color: var(--verde); }
+.codigos-lista { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.codigo { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--borde); }
+.codigo.activo { border: 2px solid var(--verde); background: #f3faf6; }
+.codigo img { display: block; width: 100%; height: 190px; object-fit: contain; background: #fff; }
+.codigo h3 { font-size: 16px; line-height: 1.3; }
+.codigo p { flex: 1; color: var(--tenue); font-size: 14px; }
+.codigo button { font-size: 15px; }
+@media (max-width: 900px) { .codigos-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .codigos-lista { grid-template-columns: 1fr; } }
+/* Código QR en grande sobre la proyección, en todas las pantallas. */
+.qr-pantalla { position: fixed; inset: 0; z-index: 1; display: grid; place-items: center; padding: 2vh; background: #fff; }
+.qr-pantalla img { display: block; max-width: 100%; max-height: 96vh; width: auto; height: auto; }

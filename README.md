@@ -14,6 +14,10 @@ Cada hito del foro tiene un mini festejo con estilo de terminal: arte ASCII anim
 
 Cada receso tiene su propia pantalla: una taza de café en arte ASCII a color con vapor animado (`dist/receso.js`), la cuenta para regresar y la actividad que sigue. El aviso pequeño usa la misma taza. Se abre sola al empezar el receso, también desde el botón «Proyectar receso» del programa, y al terminar pasa sola al contador de la siguiente actividad.
 
+## Códigos QR
+
+Debajo de los botones principales está la sección «Códigos QR» con el registro al foro y los formularios de opinión de conferencias, evaluación general del foro y evaluación de carteles (`dist/assets/qr-*.png`, tomados de los PDF del foro; la lista está en `codigos`, en `dist/app.js`). «▶ Mostrar en pantallas» pone ese código en grande sobre la proyección en todas las pantallas; se queda hasta pulsar «■ Quitar de pantallas» (en la sección) o «■ Quitar QR grande» (en los controles de la proyección). Se comparte por la misma sincronización que los tiempos.
+
 ## Control de tiempos
 
 Las participaciones pueden durar más o menos de lo programado. El botón «Control de tiempos» abre un panel para quien opera la proyección. El panel muestra la actividad en curso o la siguiente, su cuenta y el retraso o adelanto respecto al programa.
