@@ -16,7 +16,7 @@ Cada receso tiene su propia pantalla: una taza de café en arte ASCII a color co
 
 ## Códigos QR
 
-Debajo de los botones principales está la sección «Códigos QR» con el registro al foro y los formularios de opinión de conferencias, evaluación general del foro y evaluación de carteles (`dist/assets/qr-*.png`, tomados de los PDF del foro; la lista está en `codigos`, en `dist/app.js`). «▶ Mostrar en pantallas» pone ese código en grande sobre la proyección en todas las pantallas; se queda hasta pulsar «■ Quitar de pantallas» (en la sección) o «■ Quitar QR grande» (en los controles de la proyección). Se comparte por la misma sincronización que los tiempos.
+Debajo de los botones principales está la sección «Códigos QR» con el registro al foro y los formularios de opinión de conferencias, evaluación general del foro y evaluación de carteles (`dist/assets/qr-*.png`, tomados de los PDF del foro; la lista está en `codigos`, en `dist/app.js`). «▶ Mostrar en pantalla» abre la proyección (en modo automático) con ese código en grande encima, y lo pone también en todas las demás pantallas; se queda hasta pulsar «■ Quitar QR grande» en los controles de la proyección (o «■ Quitar de pantallas» en la sección), y entonces se ve el contador o receso que toca. Se comparte por la misma sincronización que los tiempos.
 
 ## Control de tiempos
 

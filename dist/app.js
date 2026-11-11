@@ -593,7 +593,7 @@ function mostrarCodigo() {
   for (const boton of document.querySelectorAll('[data-codigo]')) {
     const activo = boton.dataset.codigo === codigoEnPantalla;
     boton.classList.toggle('principal', activo);
-    boton.textContent = activo ? '■ Quitar de pantallas' : '▶ Mostrar en pantallas';
+    boton.textContent = activo ? '▶ Volver a mostrar' : '▶ Mostrar en pantalla';
     boton.closest('.codigo')?.classList.toggle('activo', activo);
   }
 }
@@ -607,7 +607,7 @@ function renderCodigos() {
     imagen.height = codigo.alto;
     imagen.alt = `Código QR: ${codigo.titulo}`;
     imagen.loading = 'lazy';
-    const boton = element('button', '', '▶ Mostrar en pantallas');
+    const boton = element('button', '', '▶ Mostrar en pantalla');
     boton.type = 'button';
     boton.dataset.codigo = codigo.id;
     tarjeta.append(imagen, element('h3', '', codigo.titulo), element('p', '', codigo.detalle), boton);
@@ -1028,9 +1028,15 @@ $('#ge-saltar').addEventListener('click', () => {
 });
 $('#ge-salir').addEventListener('click', requestClose);
 
+// Mostrar un código abre la proyección con el código en grande (y lo manda a las demás pantallas).
+// Debajo queda el modo automático, así al quitar el código se ve lo que toca.
 $('#codigos-lista').addEventListener('click', event => {
   const boton = event.target.closest('[data-codigo]');
-  if (boton) ponerCodigo(boton.dataset.codigo === codigoEnPantalla ? null : boton.dataset.codigo);
+  if (!boton) return;
+  if (boton.dataset.codigo === codigoEnPantalla && !$('#proyeccion').hidden) return ponerCodigo(null);
+  ponerCodigo(boton.dataset.codigo);
+  lastTrigger = boton;
+  if ($('#proyeccion').hidden) startAutomatic();
 });
 $('#codigos-quitar').addEventListener('click', () => ponerCodigo(null));
 $('#proy-quitar-codigo').addEventListener('click', () => ponerCodigo(null));
