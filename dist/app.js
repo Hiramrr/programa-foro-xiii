@@ -54,6 +54,7 @@ function leerAjustes(origen = leer(horarioKey)) {
     const ajuste = {};
     for (const campo of ['inicio', 'fin', 'extra']) if (Number.isFinite(value[campo])) ajuste[campo] = value[campo];
     if (value.omitida === true) ajuste.omitida = true;
+    if (typeof value.qr === 'boolean') ajuste.qr = value.qr;
     if (Object.keys(ajuste).length) valid[key] = ajuste;
   }
   return valid;
@@ -261,6 +262,7 @@ function updateEnVivo(lista, now) {
   }
   panelClock.record = record;
   updateClock(panelClock, now);
+  $('#panel-qr').textContent = qrVisible(record, real, now) ? '▦ Ocultar QR en pantallas' : '▦ Mostrar QR en pantallas';
   const estado = estadoDe(record, now);
   $('#en-vivo-estado').textContent = `${{ durante: '● En curso', extra: '● Tiempo cumplido', antes: 'Siguiente', espera: 'Siguiente', porIniciar: '◌ Esperando a que la inicies' }[estado]} · ${hora(record.startMs)} a ${record.tiempoExtra ? 'ya' : hora(record.endMs)}`;
   $('#en-vivo-titulo').textContent = record.title;
@@ -269,6 +271,25 @@ function updateEnVivo(lista, now) {
   const desfase = Math.round(((record.tiempoExtra ? now : record.endMs) - record.plannedEndMs) / minuto);
   $('#en-vivo-desfase').textContent = desfase > 0 ? `Retraso de ${desfase} min respecto al programa` : desfase < 0 ? `Adelanto de ${-desfase} min respecto al programa` : 'En horario';
   $('#en-vivo-desfase').dataset.retraso = String(desfase > 0);
+}
+
+// El QR sale antes de cada conferencia y en sus primeros minutos, salvo que se haya mostrado u ocultado a mano.
+function qrVisible(record, timeline, now) {
+  const manual = timeline.ajustes[record.key]?.qr;
+  if (typeof manual === 'boolean') return manual;
+  const estado = estadoDe(record, now);
+  return record.kind !== 'break' && (['antes', 'espera', 'porIniciar'].includes(estado) || (estado === 'durante' && now - record.startMs < qrMinutos * minuto));
+}
+
+function crearQr() {
+  const qr = element('figure', 'qr-registro');
+  const imagen = element('img');
+  imagen.src = 'assets/qr-registro.png';
+  imagen.width = 960;
+  imagen.height = 1610;
+  imagen.alt = 'Código QR para el registro al XIII Foro de Divulgación Científica en Ciencias de la Computación 2026';
+  qr.append(imagen);
+  return qr;
 }
 
 function updateVista(now) {
@@ -280,17 +301,15 @@ function updateVista(now) {
   grupo.hidden = !record;
   $('#proy-nota').hidden = !record || permitido;
   if (record) setControlesTiempo(grupo, record, now, vista.timeline, { permitido });
+  $('#proy-qr').hidden = !record;
+  if (record) $('#proy-qr').textContent = qrVisible(record, vista.timeline, now) ? '▦ Ocultar QR' : '▦ Mostrar QR';
   $('#proy-auto').setAttribute('aria-pressed', String(Boolean(automatic)));
   $('#proy-auto').textContent = automatic ? '⟳ Automático: sí' : '⟳ Automático: no';
   for (const id of ['#proy-auto', '#proy-anterior', '#proy-siguiente']) $(id).hidden = !vista;
   if (!record || !vista.clock) return;
   vista.clock.record = record;
   updateClock(vista.clock, now);
-  if (vista.panel && vista.mode === 'contador') {
-    const estado = estadoDe(record, now);
-    const conQr = record.kind !== 'break' && (['antes', 'espera', 'porIniciar'].includes(estado) || (estado === 'durante' && now - record.startMs < qrMinutos * minuto));
-    vista.panel.dataset.qr = String(conQr);
-  }
+  if (vista.panel) vista.panel.dataset.qr = String(qrVisible(record, vista.timeline, now));
   const proxima = lista.slice(lista.indexOf(record) + 1).find(r => r.day === record.day && r.kind !== 'break' && !r.omitida);
   vista.siguiente.hidden = !proxima;
   if (proxima) vista.siguiente.textContent = ['A continuación', !proxima.enEspera && hora(proxima.startMs), proxima.title, proxima.speaker].filter(Boolean).join(' · ');
@@ -564,6 +583,12 @@ function ejecutar(accion, origen, valor) {
   if (accion === 'deshacer') return deshacer(timeline);
   const lista = horario(timeline, now);
   const record = enProyeccion ? lista.find(r => r.key === vista.key) : objetivo(lista, now);
+  // Mostrar u ocultar el QR se puede siempre (también fuera del día del evento).
+  if (accion === 'qr' && record) {
+    const visible = qrVisible(record, timeline, now);
+    registrarEnsayo(timeline, 'qr');
+    return cambiar(timeline, visible ? 'QR oculto.' : 'QR en pantalla.', ajustes => { ajuste(ajustes, record.key).qr = !visible; });
+  }
   if (!record || !editable(timeline, record, now)) return;
   const estado = estadoDe(record, now);
   const curso = estado === 'durante' || estado === 'extra';
@@ -683,10 +708,14 @@ async function showProjection(record, mode, timeline = real) {
     const taza = tazaAnimada();
     vista.detener = taza.detener;
     const panel = element('div', 'contador-proyectado receso-proyectado panel');
-    panel.append(element('span', 'rotulo', '[ receso ]'), taza.nodo, element('h2', '', tituloReceso(record)));
+    const cuerpo = element('div', 'contador-cuerpo');
+    cuerpo.append(taza.nodo, element('h2', '', tituloReceso(record)));
     vista.clock = createClock(record, true);
     vista.siguiente = element('p', 'a-continuacion');
-    panel.append(vista.clock.root, vista.siguiente, element('p', 'receso-mensaje', 'Estira las piernas, toma agua y regresa a tiempo.'));
+    cuerpo.append(vista.clock.root, vista.siguiente, element('p', 'receso-mensaje', 'Estira las piernas, toma agua y regresa a tiempo.'));
+    panel.append(element('span', 'rotulo', '[ receso ]'), cuerpo, crearQr());
+    panel.dataset.qr = 'false';
+    vista.panel = panel;
     container.replaceChildren(panel);
   } else {
     const panel = element('div', 'contador-proyectado panel');
@@ -696,14 +725,7 @@ async function showProjection(record, mode, timeline = real) {
     vista.clock = createClock(record, true);
     vista.siguiente = element('p', 'a-continuacion');
     cuerpo.append(vista.clock.root, vista.siguiente);
-    const qr = element('figure', 'qr-registro');
-    const imagen = element('img');
-    imagen.src = 'assets/qr-registro.png';
-    imagen.width = 960;
-    imagen.height = 1610;
-    imagen.alt = 'Código QR para el registro al XIII Foro de Divulgación Científica en Ciencias de la Computación 2026';
-    qr.append(imagen);
-    panel.append(cuerpo, qr);
+    panel.append(cuerpo, crearQr());
     panel.dataset.qr = 'false';
     vista.panel = panel;
     container.replaceChildren(panel);
@@ -880,6 +902,9 @@ const pasosEnsayo = [
   { titulo: 'Otros botones', boton: 'Entendido',
     texto: '◀ Anterior y Siguiente ▶ cambian lo que se muestra y pausan el automático; ⟳ Automático lo vuelve a activar.\n\n⟲ Reiniciar cuenta otra vez el tiempo completo desde ahora (por ejemplo, si el ponente tardó en conectarse).\n\nEn el ensayo estos botones solo te avisan.',
     objetivo: '#proy-anterior, #proy-siguiente, #proy-auto, #proyeccion-tiempo [data-control="reiniciar"]' },
+  { titulo: 'Mostrar u ocultar el QR',
+    texto: 'El QR de registro sale solo antes de cada conferencia y en sus primeros 5 minutos.\n\nSi quieres ponerlo o quitarlo en otro momento (también en los recesos), pulsa ▦ Mostrar QR / ▦ Ocultar QR. Pruébalo.',
+    objetivo: '#proy-qr', accion: 'qr' },
   { titulo: 'Ir al receso',
     texto: 'Termina esta conferencia con ■ Terminar ahora para ver el receso.',
     objetivo: avanzarBoton, listo: () => ['durante', 'despues'].includes(estadoEnsayo('receso')) },
@@ -887,7 +912,7 @@ const pasosEnsayo = [
     texto: 'En los recesos aparece la taza y la cuenta para regresar. El receso termina solo y la pantalla pasa sola a la siguiente conferencia.\n\nNo tienes que hacer nada: espera unos segundos.',
     listo: () => ['durante', 'extra', 'despues'].includes(estadoEnsayo('sig')) },
   { titulo: '¡Listo para el foro!', boton: 'Terminar ensayo', final: true,
-    texto: '• ▶ Iniciar ahora: arrancar, sobre todo la inauguración.\n• ■ Terminar ahora: cuando el ponente acabe.\n• +/−: dar o quitar minutos.\n• ↶ Deshacer: si te equivocas.\n• ✕ Salir: cerrar la proyección. Esc solo quita la pantalla completa (F la regresa).\n\nEl día del evento, todo lo que hagas se ve al instante en todas las pantallas.' }
+    texto: '• ▶ Iniciar ahora: arrancar, sobre todo la inauguración.\n• ■ Terminar ahora: cuando el ponente acabe.\n• +/−: dar o quitar minutos.\n• ↶ Deshacer: si te equivocas.\n• ▦ Mostrar QR: poner o quitar el QR de registro.\n• ✕ Salir: cerrar la proyección. Esc solo quita la pantalla completa (F la regresa).\n\nEl día del evento, todo lo que hagas se ve al instante en todas las pantallas.' }
 ];
 function iniciarEnsayo() {
   ensayo = { paso: -1, acciones: [], desde: 0 };
