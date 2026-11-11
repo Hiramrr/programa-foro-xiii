@@ -11,6 +11,8 @@ const $ = selector => document.querySelector(selector);
 const horarioKey = simulado ? 'xiii-foro-horario-prueba' : 'xiii-foro-horario-v1';
 const controlKey = 'xiii-foro-control-v1';
 const minuto = 60000;
+// El QR de registro se muestra antes de cada conferencia y durante sus primeros minutos.
+const qrMinutos = 5;
 const formatoHora = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'America/Mexico_City' });
 const formatoFecha = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
 // Las horas se redondean al minuto más cercano, igual que los desfases.
@@ -95,7 +97,8 @@ function action(label, type, key) {
 function horario(timeline, now) {
   const dias = new Map();
   for (const record of timeline.lista) dias.set(record.day, [...(dias.get(record.day) || []), record]);
-  const esperar = control.activo && control.esperar;
+  // El tiempo extra corre solo: al agotarse el tiempo la cuenta sigue (en otro color) hasta que se termina.
+  const esperar = control.esperar;
   const lista = [...dias.values()].flatMap(actividades => calcularHorario(actividades, timeline.ajustes, now, { esperar }));
   if (!esperar) return lista;
   const iniciadas = lista.filter(r => r.kind !== 'break' && !r.omitida && !r.enEspera && r.startMs <= now && now < r.endMs && timeline.ajustes[r.key]?.inicio == null);
@@ -266,13 +269,22 @@ function updateVista(now) {
   const grupo = $('#proyeccion-tiempo');
   const lista = vista ? horario(vista.timeline, now) : [];
   const record = lista.find(r => r.key === vista?.key);
-  const activos = Boolean(record) && control.activo && editable(vista.timeline, record, now);
-  grupo.hidden = !activos;
-  $('#atajos').hidden = !activos;
-  if (activos) setControlesTiempo(grupo, record, now, vista.timeline);
+  // Los controles siempre están a la mano (también en modo automático). Fuera del día del evento se ven desactivados.
+  const permitido = Boolean(record) && editable(vista.timeline, record, now);
+  grupo.hidden = !record;
+  $('#proy-nota').hidden = !record || permitido;
+  if (record) setControlesTiempo(grupo, record, now, vista.timeline, { permitido });
+  $('#proy-auto').setAttribute('aria-pressed', String(Boolean(automatic)));
+  $('#proy-auto').textContent = automatic ? '⟳ Automático: sí' : '⟳ Automático: no';
+  for (const id of ['#proy-auto', '#proy-anterior', '#proy-siguiente']) $(id).hidden = Boolean(automatic?.demo) || !vista;
   if (!record || !vista.clock) return;
   vista.clock.record = record;
   updateClock(vista.clock, now);
+  if (vista.panel && vista.mode === 'contador') {
+    const estado = estadoDe(record, now);
+    const conQr = record.kind !== 'break' && (['antes', 'espera'].includes(estado) || (estado === 'durante' && now - record.startMs < qrMinutos * minuto));
+    vista.panel.dataset.qr = String(conQr);
+  }
   const proxima = lista.slice(lista.indexOf(record) + 1).find(r => r.day === record.day && r.kind !== 'break' && !r.omitida);
   vista.siguiente.hidden = !proxima;
   if (proxima) vista.siguiente.textContent = ['A continuación', !proxima.enEspera && hora(proxima.startMs), proxima.title, proxima.speaker].filter(Boolean).join(' · ');
@@ -425,7 +437,6 @@ function startAutomatic(demo = false) {
   const now = Date.now();
   automatic = { timeline: demo ? crearPrueba(now) : real, demo, last: '' };
   $('#etiqueta-prueba').hidden = !demo;
-  $('#cerrar-proyeccion').textContent = '✕ Detener (Esc)';
   advanceAutomatic(now);
 }
 
@@ -511,7 +522,6 @@ function ejecutar(accion, origen, valor) {
   if (enProyeccion && !vista) return;
   const timeline = enProyeccion ? vista.timeline : real;
   if (accion === 'deshacer') return deshacer(timeline);
-  if (!control.activo) return;
   const lista = horario(timeline, now);
   const record = enProyeccion ? lista.find(r => r.key === vista.key) : objetivo(lista, now);
   if (!record || !editable(timeline, record, now)) return;
@@ -529,6 +539,8 @@ function ejecutar(accion, origen, valor) {
     else cambiar(timeline, `Inicio de «${record.title}» ${texto}.`, ajustes => { ajuste(ajustes, record.key).inicio = Math.max(now, record.startMs + valor); });
   } else if (accion === 'avanzar' && curso) {
     cambiar(timeline, `«${record.title}» terminó.`, ajustes => { ajuste(ajustes, record.key).fin = now; });
+    // Sin modo automático, la pantalla pasa sola a lo que sigue.
+    if (enProyeccion && !automatic) navegar(1);
   } else if (accion === 'avanzar' && (estado === 'antes' || estado === 'espera')) {
     cambiar(timeline, `«${record.title}» inició.`, ajustes => {
       for (const r of lista) {
@@ -558,7 +570,6 @@ function alternarOmitida(key) {
 function clearProjection() {
   automatic = null;
   $('#etiqueta-prueba').hidden = true;
-  $('#cerrar-proyeccion').textContent = '✕ Salir (Esc)';
   clearTimeout(controlsTimeout);
   $('#proyeccion-contenido').replaceChildren();
   $('#proyeccion').hidden = true;
@@ -587,7 +598,7 @@ async function closeProjection() {
 function revealControls() {
   $('#proyeccion').classList.add('controles-visibles');
   clearTimeout(controlsTimeout);
-  controlsTimeout = setTimeout(() => $('#proyeccion').classList.remove('controles-visibles'), 4000);
+  controlsTimeout = setTimeout(() => $('#proyeccion').classList.remove('controles-visibles'), 3000);
 }
 
 function updateBotonPantalla() {
@@ -637,11 +648,22 @@ async function showProjection(record, mode, timeline = real) {
     container.replaceChildren(panel);
   } else {
     const panel = element('div', 'contador-proyectado panel');
-    panel.append(element('h2', '', record.title));
-    if (record.speaker) panel.append(element('p', 'ponente', record.speaker));
+    const cuerpo = element('div', 'contador-cuerpo');
+    cuerpo.append(element('h2', '', record.title));
+    if (record.speaker) cuerpo.append(element('p', 'ponente', record.speaker));
     vista.clock = createClock(record, true);
     vista.siguiente = element('p', 'a-continuacion');
-    panel.append(vista.clock.root, vista.siguiente);
+    cuerpo.append(vista.clock.root, vista.siguiente);
+    const qr = element('figure', 'qr-registro');
+    const imagen = element('img');
+    imagen.src = 'assets/qr-registro.png';
+    imagen.width = 960;
+    imagen.height = 1610;
+    imagen.alt = 'Código QR para el registro al XIII Foro de Divulgación Científica en Ciencias de la Computación 2026';
+    qr.append(imagen);
+    panel.append(cuerpo, qr);
+    panel.dataset.qr = 'false';
+    vista.panel = panel;
     container.replaceChildren(panel);
   }
   updateVista(Date.now());
@@ -694,20 +716,37 @@ $('#restablecer').addEventListener('click', () => {
   if (!confirm('¿Volver al horario original? Se quitan todos los ajustes (puedes deshacerlo).')) return;
   cambiar(real, 'Horario restablecido al programa original. Puedes deshacerlo.', ajustes => { for (const key of Object.keys(ajustes)) delete ajustes[key]; });
 });
+// Cambia la actividad en pantalla sin salir de la proyección. Moverse a mano detiene el modo automático.
+function navegar(paso) {
+  if (!vista || automatic?.demo) return;
+  const lista = horario(real, Date.now()).filter(r => !r.omitida);
+  const indice = lista.findIndex(r => r.key === vista.key);
+  const destino = lista[indice + paso];
+  if (!destino) return avisar(paso > 0 ? 'Es la última actividad.' : 'Es la primera actividad.');
+  automatic = null;
+  const record = records.get(destino.key);
+  transicion(() => showProjection(record, record.kind === 'break' ? 'receso' : 'contador'), record.kind === 'break' ? '[ receso ]' : '[ contador ]');
+}
+$('#proy-anterior').addEventListener('click', () => navegar(-1));
+$('#proy-siguiente').addEventListener('click', () => navegar(1));
+$('#proy-auto').addEventListener('click', () => {
+  if (automatic) { automatic = null; avisar('Automático en pausa: la pantalla se queda aquí.'); updateVista(Date.now()); }
+  else startAutomatic();
+});
 $('#proyeccion').addEventListener('pointermove', revealControls);
 $('#proyeccion').addEventListener('pointerdown', revealControls);
 // Atajos durante la proyección. Las flechas y avance/retroceso de página permiten usar un presentador inalámbrico.
+// Los atajos no muestran los controles en pantalla, solo un aviso pequeño.
 const atajos = { arrowright: 'avanzar', pagedown: 'avanzar', n: 'avanzar', arrowleft: 'deshacer', pageup: 'deshacer', z: 'deshacer', r: 'reiniciar', arrowup: 'mas', '+': 'mas', '=': 'mas', arrowdown: 'menos', '-': 'menos' };
 document.addEventListener('keydown', event => {
   if ($('#proyeccion').hidden) return;
-  if (event.key === 'Escape') { event.preventDefault(); requestClose(); return; }
+  // Esc solo deja la pantalla completa; para cerrar la proyección se usa el botón «Salir».
   if (event.altKey || event.target.closest?.('input, select, textarea')) return;
   const tecla = event.key.toLowerCase();
   if (tecla === 'f' && !event.ctrlKey && !event.metaKey) { event.preventDefault(); pantallaCompleta(); return; }
   const accion = atajos[tecla];
   if (!accion || $('#proyeccion-tiempo').hidden || ((event.ctrlKey || event.metaKey) && tecla !== 'z')) return;
   event.preventDefault();
-  revealControls();
   if (accion === 'mas' || accion === 'menos') ejecutar('ajustar', 'proyeccion', (accion === 'mas' ? 1 : -1) * (event.shiftKey ? 5 : 1) * minuto);
   else ejecutar(accion, 'proyeccion');
 });
@@ -715,9 +754,8 @@ document.addEventListener('fullscreenchange', () => {
   updateBotonPantalla();
   if (!hadFullscreen || document.fullscreenElement) return;
   hadFullscreen = false;
-  // En modo automático salir de pantalla completa no detiene la presentación.
-  if (automatic) { avisar('Pantalla completa desactivada. Pulsa F para volver.'); revealControls(); }
-  else clearProjection();
+  // Salir de pantalla completa no cierra la proyección.
+  avisar('Pantalla completa desactivada. Pulsa F para volver.');
 });
 document.addEventListener('visibilitychange', () => { tick(); mantenerPantalla(); });
 
