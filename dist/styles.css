@@ -319,3 +319,28 @@ button.menos:hover:not(:disabled) { background: #fbf1e2; }
   .qr-registro img { height: min(40vh, 520px); }
 }
 .proy-nota { margin: 0; color: var(--tenue); font-size: 12px; text-align: right; }
+.sync-estado { margin-top: 14px; color: var(--tenue); font-size: 14px; }
+.sync-estado[data-en-linea="true"] { color: var(--verde); }
+.sync-estado[data-en-linea="false"] { color: var(--aviso); }
+.sync-estado.corto { margin: 0 0 0 6px; font-size: 12px; }
+/* Primera actividad del día esperando a que el operador la inicie. */
+.contador-actividad[data-estado="porIniciar"] .cuenta-finalizada { color: var(--verde); }
+.contador-proyectado .contador-actividad[data-estado="porIniciar"] .cuenta-finalizada { font-size: clamp(32px, 5vw, 72px); padding: 24px 0; }
+
+/* Ensayo guiado: tarjeta con instrucciones y botón resaltado. */
+.guia-ensayo { position: fixed; z-index: 20; top: 16px; left: 16px; width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 140px); overflow: auto; padding: 18px 20px; background: #fff; border: 3px solid var(--verde); box-shadow: 8px 8px 0 rgb(8 123 61 / 18%); }
+.ge-paso { display: flex; align-items: center; gap: 10px; color: var(--verde); font-size: 14px; font-weight: 600; }
+.ge-barra { flex: 1; height: 6px; border: 1px solid var(--borde); }
+.ge-barra span { display: block; height: 100%; background: var(--verde); transition: width .3s; }
+.guia-ensayo h3 { margin-top: 10px; font-size: 22px; line-height: 1.3; }
+.ge-texto { margin-top: 10px; white-space: pre-line; font-size: 16px; line-height: 1.5; color: var(--texto); }
+.ge-espera { margin-top: 12px; padding: 8px 10px; background: #e9f6ee; color: var(--verde); font-weight: 600; }
+.ge-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.ge-acciones button { min-height: 44px; font-size: 15px; }
+#ge-saltar, #ge-salir { color: var(--tenue); font-weight: 400; }
+#proyeccion.ensayando .proyeccion-controles { opacity: 1; }
+#proyeccion.ensayando { cursor: auto; }
+.resaltado { position: relative; z-index: 1; outline: 3px solid var(--acento) !important; outline-offset: 3px; animation: resaltar 1.2s ease-in-out infinite; }
+@keyframes resaltar { 50% { outline-color: transparent; box-shadow: 0 0 0 6px rgb(0 173 77 / 25%); } }
+@media (prefers-reduced-motion: reduce) { .resaltado { animation: none; } }
+@media (min-width: 1300px) { #proyeccion.ensayando #proyeccion-contenido { padding-left: 440px; } }

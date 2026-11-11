@@ -25,6 +25,8 @@ export function estadoActividad(inicio, fin, ahora = Date.now()) {
 // así que los retrasos se arrastran y los adelantos se recuperan solo hasta volver al programa.
 // Con `esperar`, una actividad iniciada (con `inicio`) que agota su tiempo queda en tiempo extra
 // hasta que el operador la termina, y las siguientes quedan en espera.
+// Con `esperar`, una actividad marcada `manual` (la primera de cada día) no arranca sola: al llegar su hora
+// queda `porIniciar` hasta que el operador la inicia, y todo lo que sigue se recorre mientras tanto.
 export function calcularHorario(actividades, ajustes = {}, ahora = Date.now(), { esperar = false } = {}) {
   let finAnterior = -Infinity;
   let enEspera = false;
@@ -34,6 +36,11 @@ export function calcularHorario(actividades, ajustes = {}, ahora = Date.now(), {
     const base = { ...actividad, plannedStartMs: actividad.startMs, plannedEndMs: actividad.endMs, startMs, enEspera, tiempoExtra: false, omitida: false };
     if (ajuste.omitida) return { ...base, endMs: startMs, omitida: true };
     const duracion = actividad.endMs - actividad.startMs;
+    if (esperar && actividad.manual && ajuste.inicio == null && startMs <= ahora) {
+      finAnterior = ahora + duracion;
+      enEspera = true;
+      return { ...base, startMs: ahora, endMs: ahora + duracion, porIniciar: true };
+    }
     const endMs = ajuste.fin != null ? Math.max(ajuste.fin, startMs + 1000)
       : startMs + Math.max(Math.min(duracionMinima, duracion), duracion + (ajuste.extra || 0));
     const tiempoExtra = esperar && actividad.kind !== 'break' && ajuste.inicio != null && ajuste.fin == null && endMs <= ahora;

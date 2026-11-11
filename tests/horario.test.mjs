@@ -92,3 +92,21 @@ test('desglose separa días, horas, minutos y segundos', () => {
   assert.deepEqual(desglose(90061.9), { dias: 1, horas: 1, minutos: 1, segundos: 1 });
   assert.deepEqual(desglose(-5), { dias: 0, horas: 0, minutos: 0, segundos: 0 });
 });
+
+test('la primera actividad del día espera a que el operador la inicie', () => {
+  const manual = [{ ...dia[0], manual: true }, ...dia.slice(1)];
+  const antes = por(calcularHorario(manual, {}, t0 - 1000, { esperar: true }));
+  assert.equal(antes.a.porIniciar, undefined);
+  const ahora = t0 + 3 * min;
+  const h = por(calcularHorario(manual, {}, ahora, { esperar: true }));
+  assert.equal(h.a.porIniciar, true);
+  assert.equal(h.a.startMs, ahora);
+  assert.equal(h.b.enEspera, true);
+  assert.equal(h.b.startMs, ahora + 20 * min);
+  assert.equal(estadoAutomatico(Object.values(h), ahora).record.key, 'a');
+  const iniciada = por(calcularHorario(manual, { a: { inicio: ahora } }, ahora + 1000, { esperar: true }));
+  assert.equal(iniciada.a.porIniciar, undefined);
+  assert.equal(iniciada.a.endMs, ahora + 20 * min);
+  // Sin esperar, arranca sola a su hora como antes.
+  assert.equal(por(calcularHorario(manual, {}, ahora)).a.porIniciar, undefined);
+});

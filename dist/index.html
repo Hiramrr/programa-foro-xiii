@@ -7,8 +7,8 @@
   <meta name="description" content="Programa del XIII Foro de Ciencias de la Computación, con cuentas regresivas por conferencia. 12 y 13 de noviembre de 2026.">
   <meta name="theme-color" content="#ffffff">
   <link rel="canonical" href="https://hiramrr.github.io/programa-foro-xiii/">
-  <link rel="stylesheet" href="styles.css?v=18">
-  <script type="module" src="app.js?v=18"></script>
+  <link rel="stylesheet" href="styles.css?v=22">
+  <script type="module" src="app.js?v=22"></script>
 </head>
 <body>
   <div class="decor-lateral izquierda" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
@@ -40,10 +40,11 @@
         </button>
         <button id="prueba-rapida" type="button" class="modo">
           <span class="modo-icono" aria-hidden="true">✓</span>
-          <strong>Ensayo rápido</strong>
-          <small>Practica sin tocar el horario real: cuando se acabe el tiempo, pulsa «Terminar ahora» o →.</small>
+          <strong>Ensayo guiado</strong>
+          <small>Te dice paso a paso qué botón pulsar en cada momento. No cambia el horario real.</small>
         </button>
       </div>
+      <p class="sync-estado" data-sync="largo" role="status">Conectando con las demás pantallas…</p>
       <details class="guia panel">
         <summary>¿Cómo se usa? Guía rápida</summary>
         <ol>
@@ -51,6 +52,7 @@
           <li><strong>Todo se controla desde la pantalla proyectada:</strong> mueve el ratón y aparecen abajo unos controles pequeños que se ocultan solos a los 3 segundos.</li>
           <li><strong>Si alguien se pasa de tiempo</strong>, la cuenta sigue sola como tiempo extra y solo cambia de color. Cuando termine, pulsa «■ Terminar ahora» (o <kbd>→</kbd>) y pasa a lo siguiente.</li>
           <li><strong>Para sumar o quitar minutos</strong> usa −5, −1, +1, +5 o escribe otra cantidad. «◀ Anterior» y «Siguiente ▶» cambian de actividad. Si te equivocas, «↶ Deshacer».</li>
+          <li><strong>Todas las pantallas se actualizan solas:</strong> lo que hagas en una computadora (iniciar, terminar, sumar minutos) aparece en 1 o 2 segundos en todas las demás que tengan la página abierta y conexión a internet.</li>
           <li><strong>Para cerrar</strong> la proyección pulsa «✕ Salir». <kbd>Esc</kbd> solo quita la pantalla completa (vuelve con <kbd>F</kbd>).</li>
         </ol>
         <p>Atajos durante la proyección: <kbd>→</kbd> terminar/iniciar · <kbd>↑</kbd> +1 min · <kbd>↓</kbd> −1 min · <kbd>Mayús</kbd>+flecha ±5 min · <kbd>←</kbd> deshacer · <kbd>F</kbd> pantalla completa.</p>
@@ -91,6 +93,7 @@
             </div>
           </div>
         </div>
+        <p class="sync-estado" data-sync="largo">Conectando con las demás pantallas…</p>
         <p class="nota-control" id="nota-control" hidden>Los ajustes se habilitan el día del evento. Usa «Prueba rápida» para ensayarlos.</p>
         <div class="preferencias">
           <label>Al agotarse el tiempo<select id="pref-esperar"><option value="esperar">Seguir contando tiempo extra</option><option value="avanzar">Pasar sola a la siguiente actividad</option></select></label>
@@ -116,7 +119,18 @@
   </main>
 
   <section id="proyeccion" tabindex="-1" aria-label="Presentación en pantalla" hidden>
-    <span id="etiqueta-prueba" hidden>[ prueba rápida ]</span>
+    <span id="etiqueta-prueba" hidden>[ ensayo ]</span>
+    <aside class="guia-ensayo" id="guia-ensayo" aria-label="Guía del ensayo" aria-live="polite" hidden>
+      <p class="ge-paso"><span id="ge-paso"></span><span class="ge-barra"><span id="ge-progreso"></span></span></p>
+      <h3 id="ge-titulo"></h3>
+      <p class="ge-texto" id="ge-texto"></p>
+      <p class="ge-espera" id="ge-espera"></p>
+      <div class="ge-acciones">
+        <button type="button" id="ge-siguiente" class="principal"></button>
+        <button type="button" id="ge-saltar">Saltar paso</button>
+        <button type="button" id="ge-salir">Salir del ensayo</button>
+      </div>
+    </aside>
     <div class="proyeccion-controles" aria-label="Controles de la proyección">
       <div class="proy-fila" id="proyeccion-tiempo" role="group" aria-label="Ajustar el tiempo de la actividad" hidden>
         <button type="button" data-control="ajustar" data-valor="-300000" class="menos" title="Flecha abajo con Mayús">−5</button>
@@ -129,13 +143,14 @@
         <button type="button" data-control="reiniciar" title="R">⟲ Reiniciar</button>
         <button type="button" data-control="deshacer" title="Flecha izquierda">↶ Deshacer</button>
       </div>
-      <p class="proy-nota" id="proy-nota" hidden>Los ajustes de tiempo se activan el día del evento. Para ensayarlos usa «Ensayo rápido».</p>
+      <p class="proy-nota" id="proy-nota" hidden>Los ajustes de tiempo se activan el día del evento. Para practicar usa «Ensayo guiado».</p>
       <div class="proy-fila">
         <button type="button" id="proy-anterior">◀ Anterior</button>
         <button type="button" id="proy-siguiente">Siguiente ▶</button>
         <button type="button" id="proy-auto" aria-pressed="false">⟳ Automático</button>
         <button id="pantalla-completa" type="button" hidden>⛶ Pantalla completa</button>
         <button id="cerrar-proyeccion" type="button" class="salir">✕ Salir</button>
+        <span class="sync-estado corto" data-sync="corto">…</span>
       </div>
     </div>
     <div id="proyeccion-contenido"></div>
