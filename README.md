@@ -12,6 +12,8 @@ El modo automático sigue el horario real y al terminar cada participación pasa
 
 Cada hito del foro tiene un mini festejo con estilo de terminal: arte ASCII animado, texto que se escribe con cursor, barra de progreso del foro y confeti de símbolos. Se festejan el inicio del foro y de cada día, el inicio y el fin de cada participación, cada sesión completada, la mitad del foro, el cierre de cada día y la clausura. Los últimos diez segundos antes de cada actividad se marcan como cuenta final. Los festejos aparecen en pantalla completa y respetan la preferencia de movimiento reducido. Tras una pausa larga del navegador no se festejan hitos atrasados.
 
+«☕ Mostrar receso» (arriba, junto a los botones principales, y «☕ Receso» en los controles de la proyección) empieza en ese momento el receso más próximo del día con su duración completa (10 minutos), en todas las pantallas, y abre su pantalla. Lo que estaba en curso termina ahora; si todavía faltaban actividades antes de ese receso, pide confirmación y las omite (se restauran con «Restaurar» o «Deshacer»). Fuera del día del evento solo muestra la pantalla del receso. Al abrir un código QR la transición dice «[ código qr ]».
+
 Cada receso tiene su propia pantalla: una taza de café en arte ASCII a color con vapor animado (`dist/receso.js`), la cuenta para regresar y la actividad que sigue. El aviso pequeño usa la misma taza. Se abre sola al empezar el receso, también desde el botón «Proyectar receso» del programa, y al terminar pasa sola al contador de la siguiente actividad.
 
 ## Códigos QR

@@ -7,8 +7,8 @@
   <meta name="description" content="Programa del XIII Foro de Ciencias de la Computación, con cuentas regresivas por conferencia. 12 y 13 de noviembre de 2026.">
   <meta name="theme-color" content="#ffffff">
   <link rel="canonical" href="https://hiramrr.github.io/programa-foro-xiii/">
-  <link rel="stylesheet" href="styles.css?v=24">
-  <script type="module" src="app.js?v=25"></script>
+  <link rel="stylesheet" href="styles.css?v=25">
+  <script type="module" src="app.js?v=26"></script>
 </head>
 <body>
   <div class="decor-lateral izquierda" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
@@ -38,6 +38,11 @@
           <strong id="control-tiempos-texto">Abrir control de tiempos</strong>
           <small>Agrega o quita minutos, termina o inicia actividades.</small>
         </button>
+        <button id="mostrar-receso" type="button" class="modo">
+          <span class="modo-icono" aria-hidden="true">☕</span>
+          <strong>Mostrar receso</strong>
+          <small>Empieza ya el próximo receso (10 min) en todas las pantallas.</small>
+        </button>
         <button id="prueba-rapida" type="button" class="modo">
           <span class="modo-icono" aria-hidden="true">✓</span>
           <strong>Ensayo guiado</strong>
@@ -61,6 +66,7 @@
           <li><strong>Todo se controla desde la pantalla proyectada:</strong> mueve el ratón y aparecen abajo unos controles pequeños que se ocultan solos a los 3 segundos.</li>
           <li><strong>Si alguien se pasa de tiempo</strong>, la cuenta sigue sola como tiempo extra y solo cambia de color. Cuando termine, pulsa «■ Terminar ahora» (o <kbd>→</kbd>) y pasa a lo siguiente.</li>
           <li><strong>El QR de registro</strong> sale solo antes de cada conferencia y en sus primeros 5 minutos. Con «▦ Mostrar QR» / «▦ Ocultar QR» lo pones o lo quitas cuando quieras (también en los recesos).</li>
+          <li><strong>Receso:</strong> «☕ Mostrar receso» (arriba o en los controles de la proyección) empieza en ese momento el receso más próximo con su cuenta de 10 minutos en todas las pantallas. Al terminar, la pantalla pasa sola a lo que sigue.</li>
           <li><strong>Formularios y registro:</strong> en la sección «Códigos QR» pulsa «▶ Mostrar en pantalla» y se abre la pantalla con el registro, la opinión de conferencias, la evaluación general o la de carteles en grande (también en las demás pantallas). «■ Quitar QR grande» lo quita.</li>
           <li><strong>Para sumar o quitar minutos</strong> usa −5, −1, +1, +5 o escribe otra cantidad. «◀ Anterior» y «Siguiente ▶» cambian de actividad. Si te equivocas, «↶ Deshacer».</li>
           <li><strong>Todas las pantallas se actualizan solas:</strong> lo que hagas en una computadora (iniciar, terminar, sumar minutos) aparece en 1 o 2 segundos en todas las demás que tengan la página abierta y conexión a internet.</li>
@@ -159,6 +165,7 @@
       <div class="proy-fila">
         <button type="button" id="proy-anterior">◀ Anterior</button>
         <button type="button" id="proy-siguiente">Siguiente ▶</button>
+        <button type="button" id="proy-receso">☕ Receso</button>
         <button type="button" id="proy-qr" data-control="qr">▦ Mostrar QR</button>
         <button type="button" id="proy-quitar-codigo" class="principal" hidden>■ Quitar QR grande</button>
         <button type="button" id="proy-auto" aria-pressed="false">⟳ Automático</button>
