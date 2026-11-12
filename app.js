@@ -415,7 +415,7 @@ function advanceAutomatic(now) {
   const state = estadoAutomatico(lista.filter(r => !r.omitida), now);
   const key = `${state.mode}:${state.record?.key || ''}`;
   if (automatic.last === key) return;
-  const rotulo = !automatic.last ? (automatic.demo ? '[ ensayo ]' : '[ modo automático ]')
+  const rotulo = !automatic.last ? (automatic.rotuloInicial || (automatic.demo ? '[ ensayo ]' : '[ modo automático ]'))
     : state.mode === 'receso' ? '[ receso ]'
     : state.mode === 'contador' ? '[ siguiente actividad ]'
     : automatic.demo ? '[ ensayo terminado ]' : '[ programa concluido ]';
@@ -467,9 +467,9 @@ function crearEnsayo(now) {
   return { lista, ajustes: {}, historial: [], persistente: false };
 }
 
-function startAutomatic(demo = false) {
+function startAutomatic(demo = false, rotuloInicial = '') {
   const now = Date.now();
-  automatic = { timeline: demo ? crearEnsayo(now) : real, demo, last: '' };
+  automatic = { timeline: demo ? crearEnsayo(now) : real, demo, last: '', rotuloInicial };
   $('#etiqueta-prueba').hidden = !demo;
   if (demo) iniciarEnsayo();
   else terminarEnsayo();
@@ -1036,8 +1036,44 @@ $('#codigos-lista').addEventListener('click', event => {
   if (boton.dataset.codigo === codigoEnPantalla && !$('#proyeccion').hidden) return ponerCodigo(null);
   ponerCodigo(boton.dataset.codigo);
   lastTrigger = boton;
-  if ($('#proyeccion').hidden) startAutomatic();
+  if ($('#proyeccion').hidden) startAutomatic(false, '[ código qr ]');
 });
+
+// «Mostrar receso»: empieza ya el receso más próximo, con su duración completa, en todas las pantallas.
+// Lo que estaba en curso termina ahora. Si faltaban actividades antes de ese receso, se omiten (se pueden restaurar).
+function iniciarReceso() {
+  const enProyeccion = !$('#proyeccion').hidden && vista;
+  const timeline = enProyeccion ? vista.timeline : real;
+  const now = Date.now();
+  const lista = horario(timeline, now);
+  const hoyDia = Object.keys(programa).find(key => programa[key].date === hoy(now));
+  const delDia = lista.filter(r => !timeline.persistente || !hoyDia || r.day === hoyDia);
+  const receso = delDia.find(r => r.kind === 'break' && !r.omitida && estadoDe(r, now) !== 'despues');
+  if (!receso) return avisar('Ya no quedan recesos hoy.');
+  const mostrar = () => {
+    if ($('#proyeccion').hidden) startAutomatic(false, '[ receso ]');
+    else if (!automatic) transicion(() => showProjection(records.get(receso.key), 'receso', timeline), '[ receso ]');
+  };
+  if (estadoDe(receso, now) === 'durante') return mostrar();
+  if (!editable(timeline, receso, now)) {
+    avisar('El receso se puede iniciar el día del evento. Para practicar usa el «Ensayo guiado».');
+    return transicion(() => showProjection(records.get(receso.key), 'receso', timeline), '[ receso ]');
+  }
+  const previas = delDia.slice(0, delDia.indexOf(receso)).filter(r => r.day === receso.day && !r.omitida);
+  const pendientes = previas.filter(r => ['antes', 'espera', 'porIniciar'].includes(estadoDe(r, now)));
+  if (pendientes.length && !confirm(`Antes de ese receso todavía faltan ${pendientes.length === 1 ? '1 actividad' : `${pendientes.length} actividades`}:\n\n${pendientes.map(r => `• ${r.title}`).join('\n')}\n\nSi empiezas el receso ahora, se omiten (puedes restaurarlas o pulsar Deshacer). ¿Empezar el receso?`)) return;
+  cambiar(timeline, `${tituloReceso(receso)} iniciado.`, ajustes => {
+    for (const r of previas) {
+      if (enCurso(r, now)) ajuste(ajustes, r.key).fin = now;
+      else if (pendientes.includes(r)) ajuste(ajustes, r.key).omitida = true;
+    }
+    ajustes[receso.key] = { inicio: now };
+  });
+  registrarEnsayo(timeline, 'receso');
+  mostrar();
+}
+$('#mostrar-receso').addEventListener('click', event => { lastTrigger = event.currentTarget; iniciarReceso(); });
+$('#proy-receso').addEventListener('click', iniciarReceso);
 $('#codigos-quitar').addEventListener('click', () => ponerCodigo(null));
 $('#proy-quitar-codigo').addEventListener('click', () => ponerCodigo(null));
 window.addEventListener('storage', event => {

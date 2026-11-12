@@ -362,3 +362,7 @@ button.menos:hover:not(:disabled) { background: #fbf1e2; }
 /* Código QR en grande sobre la proyección, en todas las pantallas. */
 .qr-pantalla { position: fixed; inset: 0; z-index: 1; display: grid; place-items: center; padding: 2vh; background: #fff; }
 .qr-pantalla img { display: block; max-width: 100%; max-height: 96vh; width: auto; height: auto; }
+.modos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#mostrar-receso { color: var(--verde); border-color: var(--verde); }
+@media (max-width: 1000px) { .modos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .modos { grid-template-columns: 1fr; } }
